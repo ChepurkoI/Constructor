@@ -1,0 +1,1 @@
+chrome driver (устанавливать согласно версии google): https://googlechromelabs.github.io/chrome-for-testing/

@@ -1,3 +1,4 @@
+from sys import platform
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -41,7 +42,7 @@ class constructor():
 
                  # "C:\\Users\\Ingvar\\chromedriver_win32\\chromedriver.exe"
                  web_driver="C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe",  # расположение chromedriver.exe
-                 # Windows: "C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe"
+                 # Windows: ""
                  # Linux:
 
                  path_downloads='C:\\Users\\Ingvar\\Downloads',
@@ -54,6 +55,11 @@ class constructor():
                  button_text_new_page="Показать ещё",  # текст на кнопке, которая переводит на след. страницу поиска
                  button_characteristics="Развернуть все"  # текст на кнопке, которая открывает хар-ки
                  ):
+        # местоположение chromedriver
+        if platform == "linux" or platform == "linux2":
+            self.web_driver = "home/Ingvar/PycharmProjects/parsing_constructor/chromedriver_linux64"
+        elif platform == "windows":
+            self.web_driver = "C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe"
 
         # общие сведения
         self.name_website = name_website  # имя сайта, с которым работаем,
