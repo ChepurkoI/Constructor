@@ -58,7 +58,7 @@ class constructor():
         # местоположение chromedriver
         if platform == "linux" or platform == "linux2":
             self.web_driver = "home/Ingvar/PycharmProjects/parsing_constructor/chromedriver_linux64"
-        elif platform == "windows":
+        elif platform == "win32":
             self.web_driver = "C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe"
 
         # общие сведения
