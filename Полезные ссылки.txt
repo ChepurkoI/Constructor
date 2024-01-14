@@ -1,1 +1,3 @@
 chrome driver (устанавливать согласно версии google): https://googlechromelabs.github.io/chrome-for-testing/
+
+На Linux требует установить для работы Mouseinfo tkinter: sudo apt-get install python3-tk python3-dev

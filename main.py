@@ -40,13 +40,9 @@ class constructor():
                  name_class_value="",
                  name_characteristics="",
 
-                 # "C:\\Users\\Ingvar\\chromedriver_win32\\chromedriver.exe"
-                 web_driver="C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe",  # расположение chromedriver.exe
-                 # Windows: ""
-                 # Linux:
-
-                 path_downloads='C:\\Users\\Ingvar\\Downloads',
-                 # '/home/igor/PycharmProjects/HTML',  # путь до папки "Загрузки"
+                 web_driver="",  # расположение chromedriver.exe
+                 path_downloads="", # путь до папки "Загрузки"
+                 separator_for_path='',
 
                  name_teg_last_page="a",  # тег номера последней страницы, отображ-ся на сайте
                  name_attribute_last_page="class",  # по какому атрибуту искать номер последней страницы (class/role)
@@ -55,11 +51,34 @@ class constructor():
                  button_text_new_page="Показать ещё",  # текст на кнопке, которая переводит на след. страницу поиска
                  button_characteristics="Развернуть все"  # текст на кнопке, которая открывает хар-ки
                  ):
+
+        # сведения для скачивания страниц
+
+        # Переданные параметры для chromedriver и папки Загрузки
+        self.web_driver = web_driver
+        self.path_downloads = path_downloads
+        self.separator_for_path = separator_for_path
+
         # местоположение chromedriver
-        if platform == "linux" or platform == "linux2":
-            self.web_driver = "home/Ingvar/PycharmProjects/parsing_constructor/chromedriver_linux64"
-        elif platform == "win32":
-            self.web_driver = "C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe"
+        if web_driver == "": # если параметр не задан
+            if platform == "linux" or platform == "linux2":
+                self.web_driver = "/home/ingvar/PycharmProjects/parser/parsing_constructor/chromedriver_linux64/chromedriver"
+            elif platform == "win32":
+                self.web_driver = "C:\\Users\\Ingvar\\PycharmProjects\\\\chromedriver_win64\\chromedriver.exe"
+
+        # путь до папки "Загрузки"
+        if path_downloads == "":  # если параметр не задан
+            if platform == "linux" or platform == "linux2":
+                self.path_downloads = "/home/ingvar/Загрузки"
+            elif platform == "win32":
+                self.path_downloads = "C:\\Users\\Ingvar\\Downloads"
+
+        # разделитель для указания пути к файлам\папкам
+        if separator_for_path == "":  # если параметр не задан
+            if platform == "linux" or platform == "linux2":
+                self.separator_for_path = "/"
+            elif platform == "win32":
+                self.separator_for_path = "\\"
 
         # общие сведения
         self.name_website = name_website  # имя сайта, с которым работаем,
@@ -78,9 +97,6 @@ class constructor():
         self.name_class_value = name_class_value  # имя класса, по которому ищем
         self.name_characteristics = name_characteristics  # имя характеристики
 
-        # сведения для скачивания страниц
-        self.web_driver = web_driver  # расположение chromedriver.exe
-        self.path_downloads = path_downloads  # путь до папки "Загрузки"
 
         self.name_teg_last_page = name_teg_last_page  # тег номера последней страницы, отображ-ся на сайте
         self.name_attribute_last_page = name_attribute_last_page  # по какому атрибуту искать номер последней страницы (class/role)
@@ -150,7 +166,7 @@ class constructor():
         """
         type_value = "href"
 
-        files = os.listdir(self.path_downloads + '\\' + self.name_website)
+        files = os.listdir(self.path_downloads + self.separator_for_path + self.name_website)
         count_sait = list(filter(lambda x: x.endswith('.html'), files))
         # print("count_sait", count_sait)
         num_page_old = len(count_sait)  # кол-во скачанных страниц, из к-х нужно доставать ссылки
@@ -160,7 +176,7 @@ class constructor():
         for i in range(0, num_page_old):
             name_file = self.name_website + str(i) + '.html'
 
-            with open(self.path_downloads + '\\' + self.name_website + '\\' + name_file,
+            with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name_file,
                       "r",
                       encoding='utf-8') as html_file:
                 self._tree_dom_bs4 = BeautifulSoup(html_file, 'lxml')
@@ -173,7 +189,7 @@ class constructor():
                 Nodes = self._tree_dom_bs4.find_all(self.name_tag)
             print(f"Количество возможных ссылок: {len(Nodes)}")
             print(f"{self.name_tag}, {self.name_class}")
-            with open(self.path_downloads + '\\' + self.name_website + '\\' + "product_links.txt", "a",
+            with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt", "a",
                       encoding='utf-8') as file:
                 for i in range(len(Nodes)):
                     # print(Nodes[i].prettify())
@@ -405,7 +421,7 @@ class constructor():
 
         while datetime.now() < wait_end_time:
             try:
-                f = open(self.path_downloads + "\\" + name)
+                f = open(self.path_downloads + self.separator_for_path + name)
                 f.close()
                 break
             except:
@@ -430,17 +446,19 @@ class constructor():
 
     def download_pages(self):
 
+
         # Создание/переименовывание папки, в которой будут лежать скачанные страницы
-        if not os.path.isdir(self.path_downloads + '\\' + self.name_website):
-            os.mkdir(self.path_downloads + '\\' + self.name_website)
+        if not os.path.isdir(self.path_downloads + self.separator_for_path + self.name_website):
+            os.mkdir(self.path_downloads + self.separator_for_path + self.name_website)
         else:
-            os.rename(self.path_downloads + '\\' + self.name_website,
-                      self.path_downloads + '\\' + self.name_website + str(datetime.now().date()) +
+            os.rename(self.path_downloads + self.separator_for_path + self.name_website,
+                      self.path_downloads + self.separator_for_path + self.name_website + str(datetime.now().date()) +
                       '_' + str(datetime.now().microsecond))
-            os.mkdir(self.path_downloads + '\\' + self.name_website)
+            os.mkdir(self.path_downloads + self.separator_for_path + self.name_website)
 
         s = Service(self.web_driver)
         driver = webdriver.Chrome(service=s)  # запустить браузер
+
         driver.implicitly_wait(1)
         driver.maximize_window()  # открыть окно браузера на весь экран
 
@@ -452,13 +470,13 @@ class constructor():
 
             # извлечение и сохранение данных страницы в папку в файл
             page = driver.find_element(By.XPATH, "//body").get_attribute("outerHTML")
-            with open(self.path_downloads + '\\' + self.name_website + "\\" + name, "w", encoding="utf-8") as file:
+            with open(self.path_downloads + self.separator_for_path + self.name_website + "\\" + name, "w", encoding="utf-8") as file:
                 file.write(page)
             time.sleep(5)
             """
             self.Save_html(name)
-            os.replace(self.path_downloads + '\\' + name,
-                       self.path_downloads + '\\' + self.name_website + "\\" + name)
+            os.replace(self.path_downloads + self.separator_for_path + name,
+                       self.path_downloads + self.separator_for_path + self.name_website + "\\" + name)
             # print("pered while")
             """
             flag_not_click = 0
@@ -466,7 +484,7 @@ class constructor():
 
                 # Поиск количества страниц в скачанном файле
                 name = self.name_website + str(num_page_old - 1) + '.html'
-                with open(self.path_downloads + '\\' + self.name_website + '\\' + name,
+                with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name,
                           'r', encoding="utf-8") as name_html:
                     soup = BeautifulSoup(name_html, 'lxml')
                     if (self.name_attribute_last_page == 'class'):
@@ -533,14 +551,14 @@ class constructor():
                         # my_wait(driver, 0.1, 30)
                         page = driver.find_element(By.XPATH, "//body").get_attribute("outerHTML")
 
-                        with open(self.path_downloads + '\\' + self.name_website + "\\" + name, "w",
+                        with open(self.path_downloads + self.separator_for_path + self.name_website + "\\" + name, "w",
                                   encoding="utf-8") as file:
                             file.write(page)
                         time.sleep(1)
                         """
                         self.Save_html(name)
-                        os.replace(self.path_downloads + '\\' + name,
-                                   self.path_downloads + '\\' + self.name_website + "\\" + name)
+                        os.replace(self.path_downloads + self.separator_for_path + name,
+                                   self.path_downloads + self.separator_for_path + self.name_website + "\\" + name)
                         """
 
                         num_page_old = i + 1  # int(num_page_new)
@@ -642,15 +660,17 @@ class constructor():
 
 
     def download_unic_pages(self):
-        if not os.path.isdir(self.path_downloads + '\\' + self.name_website + '_unic'):
-            os.mkdir(self.path_downloads + '\\' + self.name_website + '_unic')
+
+
+        if not os.path.isdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic'):
+            os.mkdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
         else:
-            os.rename(self.path_downloads + '\\' + self.name_website + '_unic',
-                      self.path_downloads + '\\' + self.name_website + '_unic' + str(datetime.now().date()) +
+            os.rename(self.path_downloads + self.separator_for_path + self.name_website + '_unic',
+                      self.path_downloads + self.separator_for_path + self.name_website + '_unic' + str(datetime.now().date()) +
                       '_' + str(datetime.now().microsecond))
-            os.mkdir(self.path_downloads + '\\' + self.name_website + '_unic')
+            os.mkdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
         unic_url = list()
-        with open(self.path_downloads + '\\' + self.name_website + '\\' + "product_links.txt", "r",
+        with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt", "r",
                   encoding='utf-8') as file:
             for line in file:
                 # unic_url.append(self.head_url + line)
@@ -680,14 +700,14 @@ class constructor():
                     time.sleep(2)
                     name = self.name_website + '_unic_' + str(i) + '.html'
                     page = driver.find_element(By.XPATH, "//*").get_attribute("outerHTML")
-                    with open(self.path_downloads + '\\' + self.name_website + '_unic' + '\\' + name, "w",
+                    with open(self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name, "w",
                               encoding="utf-8") as file:
                         file.write(page)
                     time.sleep(1)
                     """
                     self.Save_html(name)
-                    os.replace(self.path_downloads + '\\' + name,
-                               self.path_downloads + '\\' + self.name_website + '_unic' + '\\' + name)
+                    os.replace(self.path_downloads + self.separator_for_path + name,
+                               self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name)
                     """
                 except Exception as ex:
                     print(ex)
@@ -740,7 +760,9 @@ class constructor():
 
     def extraction_data(self):
 
-        files = os.listdir(self.path_downloads + '\\' + self.name_website + '_unic')
+
+
+        files = os.listdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
         list_files = list(filter(lambda x: x.endswith('.html'), files))
         print(f"Кол-во скачанных страниц товара: \n{len(list_files)}")
         temp_dict = dict()
@@ -753,7 +775,7 @@ class constructor():
         # По всем скачанным файлам товара
         for name_file in list_files:
             #name = self.name_website + '_unic_' + str(i) + '.html'
-            with open(self.path_downloads + '\\' + self.name_website + '_unic' + '\\' + name_file,
+            with open(self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file,
                       'r',encoding="utf-8") as html_file:
                 self._tree_dom_bs4 = BeautifulSoup(html_file, "lxml")
 
