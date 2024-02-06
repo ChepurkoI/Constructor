@@ -1,11 +1,13 @@
 from sys import platform
 from selenium import webdriver
+from selenium_stealth import stealth
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 # Для автоматической установки и указания пути к WebDriver
-# from webdriver_manager.chrome import ChromeDriverManager # https://automated-testing.info/t/python-webdriver-manager-dlya-avtomatizaczii-upravleniya-drajverami/12101
+# from webdriver_manager.chrome import ChromeDriverManager
+# https://automated-testing.info/t/python-webdriver-manager-dlya-avtomatizaczii-upravleniya-drajverami/12101
 
 from selenium.webdriver.support.ui import WebDriverWait
 # from selenium.webdriver.support.wait import WebDriverWait
@@ -15,20 +17,20 @@ from selenium.webdriver.chrome.options import Options
 
 # Для расширенного функционала по настройке proxy, заголовков, cookies и прочего
 # Есть проблемы, чего-то не хватает для полного функционирования
-import seleniumwire.undetected_chromedriver as uc 
+# import seleniumwire.undetected_chromedriver as uc
 
 # _______________________________________________________________________
 
 # Import согласно scrapeOps
-#импорт нашего веб-драйвера
+# импорт нашего веб-драйвера
 # from selenium import webdriver дубликат
-#импорт ActionChains
+# импорт ActionChains
 from selenium.webdriver import ActionChains
-#импорт By
+# импорт By
 # from selenium.webdriver.common.by import By дубликат
-#импорт ScrollOrigin
+# импорт ScrollOrigin
 from selenium.webdriver.common.actions.wheel_input import ScrollOrigin
-#импортируем возможность сна
+# импортируем возможность сна
 # from time import sleep # дубликат для import time
 
 # _______________________________________________________________________
@@ -46,7 +48,8 @@ import json
 import pprint
 
 from bs4 import BeautifulSoup
-import pandas as pd
+# import pandas as pd
+import numpy as np
 
 class constructor_():
     def __init__(
@@ -203,7 +206,7 @@ class constructor_():
             EC.presence_of_element_located((
                 By.CSS_SELECTOR, selector))
         )
-        
+
         #выполняем цепочку действий
         actions\
             .move_to_element(open_menu)\
@@ -543,12 +546,81 @@ class constructor_():
 
         # Закрыть окно браузера
         driver.quit()
-    
+
+    def use_stealth(self):
+        PROXY = '50.228.83.226:80'
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument('--proxy-server=%s' % PROXY)
+        s = Service(self.web_driver)
+        driver = webdriver.Chrome(service=s, options=chrome_options)
+        
+        stealth(driver,
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+                languages=["en-US", "en"],
+                vendor="Google Inc.",
+                platform="Win32",
+                webgl_vendor="Intel Inc.",
+                renderer="Intel Iris OpenGL Engine",
+                fix_hairline=True,
+                )
+        
+        driver.get("https://yandex.ru/internet")
+        driver.maximize_window()
+        time.sleep(15)
+        driver.quit()
 ScrapeOps = constructor_()
-ScrapeOps.smooth_scroll()
 
 
 # ScrapeOps.Example_without_wait() # Работают одинаково на примере Дрома
 # ScrapeOps.Example_with_wait() # Как первый так и второй загружают и выводят текст меню "Ещё"
 
-from selenium import webdriver
+# ________________________________________________________________________________________________________________________________________________
+# ________________________________________________________________________________________________________________________________________________
+# ________________________________________________________________________________________________________________________________________________
+# ________________________________________________________________________________________________________________________________________________
+
+s = Service("C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe")
+driver = webdriver.Chrome(service=s)  # запустить браузер
+
+stealth(driver,
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+        languages=["en-US", "en"],
+        vendor="Google Inc.",
+        platform="Win32",
+        webgl_vendor="Intel Inc.",
+        renderer="Intel Iris OpenGL Engine",
+        fix_hairline=True,
+        )
+driver.maximize_window()
+driver.get("file:///C:/Users/Ingvar/Downloads/one_car.html")
+time.sleep(3)
+
+# Выкладываю данные про кнопки с общего массива данных
+buttons = [{'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'ПТС'},
+           {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'о регистрации'},
+           {'teg_name': 'button', 'class_name': 'ezmft1z0 css-xst070 e104a11t0', 'button_text': 'фото'},
+           {'teg_name': 'button', 'class_name': 'css-18zgczx e3cb8x01', 'button_text': 'контакты'}] 
+
+try: # для каждой страницы нажимаем группу кнопок (массив словарей с данными)
+    for button_data in buttons: # идем по списку кнопок
+        try: # пробуем поочередно нажать на кнопки
+            print(f"Кнопка: {button_data}")
+            time.sleep(2)
+            Xpath_button = '//' + button_data["teg_name"] + '[@class="'+ button_data["class_name"] + '" and not(@disabled)]'
+            #Xpath_button_with_text = '//'+ button_data['teg_name'] + '[text()="' + button_data["button_text"] + '" and not(@disabled)]'
+            WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, Xpath_button)))
+            time.sleep(2)
+            candidates_buttons = driver.find_elements(By.XPATH, Xpath_button)
+            for i in range(len(candidates_buttons)):
+                if button_data["button_text"] in candidates_buttons[i].text:
+                    candidates_buttons[i].click
+                    print(f"Нажата клавиша {candidates_buttons[i].text}")
+                    print("\n\n")
+        
+        except: # если не получилось нажать на кнопку
+            continue
+        
+except:
+    print("Not click Не получилось нажать кнопку развертывания характеристик или фото")
+    # continue

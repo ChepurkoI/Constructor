@@ -1,7 +1,5 @@
 lxml
 bs4
-pyarrow
 pyautogui
 selenium
 requests
-pandas

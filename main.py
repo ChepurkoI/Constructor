@@ -1,8 +1,11 @@
 from sys import platform
+
+import pandas as pd
 from selenium import webdriver
+from selenium_stealth import stealth
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys # Для работы с клавиатурой
+from selenium.webdriver.common.keys import Keys  # Для работы с клавиатурой
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.wait import WebDriverWait
@@ -17,16 +20,16 @@ import pyautogui
 import os
 import requests
 import json
+import string
+
 
 import pprint
 
 from bs4 import BeautifulSoup
-import pandas as pd
+# import pandas as pd
 import itertools
 
-from urllib.parse import urlencode # Для генерации url, который работает через Proxy
-        
-
+from urllib.parse import urlencode  # Для генерации url, который работает через Proxy
 
 
 class constructor():
@@ -39,23 +42,23 @@ class constructor():
                  name_tag="",
                  name_class="",
 
-                 name_tag_title="",
-                 name_class_title="",
-
-                 name_tag_value="",
-                 name_class_value="",
-                 name_characteristics="",
 
                  web_driver="",  # расположение chromedriver.exe
-                 path_downloads="", # путь до папки "Загрузки"
+                 path_downloads="",  # путь до папки "Загрузки"
                  separator_for_path='',
+                 use_proxy=False,  # использование proxy при работе
+                 list_proxy=list(),  # список доступных proxy
 
-                 name_teg_last_page="a",  # тег номера последней страницы, отображ-ся на сайте
-                 name_attribute_last_page="class",  # по какому атрибуту искать номер последней страницы (class/role)
-                 name_class_last_page="pagination-widget__page-link",
-                 # имя класса номера последней страницы, отображ-ся на сайте
-                 button_text_new_page="Показать ещё",  # текст на кнопке, которая переводит на след. страницу поиска
-                 button_characteristics="Развернуть все"  # текст на кнопке, которая открывает хар-ки
+                #  name_teg_last_page="a",  # тег номера последней страницы, отображ-ся на сайте
+                #  name_attribute_last_page="class",  # по какому атрибуту искать номер последней страницы (class/role)
+                #  name_class_last_page="pagination-widget__page-link",
+                #  # имя класса номера последней страницы, отображ-ся на сайте
+                #  button_text_new_page="Показать ещё",  # текст на кнопке, которая переводит на след. страницу поиска
+                
+                 tag_link_next_page = '', # Тег внутри которого лежит ссылка на новую страницу
+                 class_link_next_page = '' # Класс внутри которого лежит ссылка на новую страницу
+
+                 
                  ):
 
         # сведения для скачивания страниц
@@ -66,7 +69,7 @@ class constructor():
         self.separator_for_path = separator_for_path
 
         # местоположение chromedriver
-        if web_driver == "": # если параметр не задан
+        if web_driver == "":  # если параметр не задан
             if platform == "linux" or platform == "linux2":
                 self.web_driver = "/home/ingvar/PycharmProjects/parser/parsing_constructor/chromedriver_linux64/chromedriver"
             elif platform == "win32":
@@ -94,56 +97,58 @@ class constructor():
         self.name_tag = name_tag
         self.name_class = name_class
 
-        # сведения по заголовку хар-ки
-        self.name_tag_title = name_tag_title  # имя тега заголовка хар-ки, по которому ищем
-        self.name_class_title = name_class_title  # имя класса, по которому ищем
-
-        # сведения по зн-ю хар-ки
-        self.name_tag_value = name_tag_value  # имя тега зн-я хар-ки, по которому ищем
-        self.name_class_value = name_class_value  # имя класса, по которому ищем
-        self.name_characteristics = name_characteristics  # имя характеристики
 
 
-        self.name_teg_last_page = name_teg_last_page  # тег номера последней страницы, отображ-ся на сайте
-        self.name_attribute_last_page = name_attribute_last_page  # по какому атрибуту искать номер последней страницы (class/role)
-        self.name_class_last_page = name_class_last_page  # имя класса номера последней страницы, отображ-ся на сайте
-        self.button_text_new_page = button_text_new_page  # текст на кнопке, которая переводит на след. страницу поиска
-        self.button_characteristics = button_characteristics  # текст на кнопке, которая открывает хар-ки
+        self.tag_link_next_page = tag_link_next_page # Тег внутри которого лежит ссылка на новую страницу
+        self.class_link_next_page = class_link_next_page # Класс внутри которого лежит ссылка на новую страницу
+
+        # self.name_teg_last_page = name_teg_last_page  # тег номера последней страницы, отображ-ся на сайте
+        # self.name_attribute_last_page = name_attribute_last_page  # по какому атрибуту искать номер последней страницы (class/role)
+        # self.name_class_last_page = name_class_last_page  # имя класса номера последней страницы, отображ-ся на сайте
+        # self.button_text_new_page = button_text_new_page  # текст на кнопке, которая переводит на след. страницу поиска
+        
+        
 
         self._url_server = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
+        self.use_proxy = use_proxy
         self._tree_dom_bs4 = None
         self._list_rules = []
+        self.buttons_data = []
 
     def get_proxy_url(self, API_KEY, url):
         """
         Источник: https://scrapeops.io/selenium-web-scraping-playbook/python-selenium-find-elements-xpath/
         В самом конце находилась эта функция.
-        
+
         НЕ ДО КОНЦА ЯСНО, КАК ЕЁ ПРИМЕНЯТЬ
         """
-        API_KEY="YOUR-SUPER-SECRET-API-KEY"
+        API_KEY = "YOUR-SUPER-SECRET-API-KEY"
         payload = {
             "api_key": API_KEY,
             "url": url
         }
-        #кодируем url, который вы хотите получить, и объединяем его с url прокси-сервера
+        # кодируем url, который вы хотите получить, и объединяем его с url прокси-сервера
         proxy_url = "Url сайта, например https://proxy.scrapeops.io/v1/?" + urlencode(payload)
         # возвращает url сайта, переданного через прокси
         return proxy_url
-       
 
 
-    def get_request(self):
-        # 'https://a2da-89-179-47-18.eu.ngrok.io/api/information/'
+    def get_request(self, dict_result={}):
+        
+        if not(dict_result): # если словарь пуст
+            
+            'https://a2da-89-179-47-18.eu.ngrok.io/api/information/'
 
-        if "api/information" in self._url_server:
-            get_result = requests.get(self._url_server)
-            #print(get_result.text)
-            dict_result = dict(get_result.json())
-        else:
-            print("В названии ссылки на сервер отсутствует в конце api/information")
+            if "api/information" in self._url_server:
+                get_result = requests.get(self._url_server)
+                # print(get_result.text)
+                dict_result = dict(get_result.json())
+            else:
+                print("В названии ссылки на сервер отсутствует в конце api/information")
+                return 0
 
         """Единожды / one"""
+
         # общие сведения
         self.name_website = dict_result['designer']['one']['site']
         self.name_product = dict_result['designer']['one']['type_product']
@@ -153,39 +158,32 @@ class constructor():
         self.name_class = dict_result['designer']['one']['class_name_url']
 
         # сведения для скачивания страниц
-        self.name_teg_last_page = dict_result['designer']['one']['teg_name_number']
-        self.name_attribute_last_page = dict_result['designer']['one']['role_name_url']
-        self.name_class_last_page = dict_result['designer']['one']['class_name_number']
-        self.button_text_new_page = dict_result['designer']['one']['name_button']
+        self.tag_link_next_page = dict_result['designer']['one']['teg_name_number']
+        self.class_link_next_page = dict_result['designer']['one']['class_name_number']
 
-        #???self.button_characteristics = dict_result['designer']
+        # self.name_teg_last_page = dict_result['designer']['one']['teg_name_number']
+        # self.name_attribute_last_page = dict_result['designer']['one']['role_name_url']
+        # self.name_class_last_page = dict_result['designer']['one']['class_name_number']
+        # self.button_text_new_page = dict_result['designer']['one']['name_button']
 
         """Многократно / many"""
 
+        self.buttons_data = dict_result['designer']['buttons']
+
+
         temp = dict_result['designer']['many']
         print(f"Число правил для товара: {len(temp)}")
-        for dict_param in temp:
-            print(f"{dict_param['title']} : {len(dict_param['title'])}")
-            print(f"{dict_param['teg_name']}: {len(dict_param['teg_name'])}")
-            print(f"{dict_param['class_name']} : {len(dict_param['class_name'])}")
-
+        # for dict_param in temp:
+        #     print(f"{dict_param['title']} : {len(dict_param['title'])}")
+        #     print(f"{dict_param['teg_name']}: {len(dict_param['teg_name'])}")
+        #     print(f"{dict_param['class_name']} : {len(dict_param['class_name'])}")
 
         # сведения по заголовку хар-ки
-
-        self._list_rules = dict_result['designer']['many'] # список из словарей, ключами являются название хар-ки, тег и аттрибуты
-        # self.name_tag_title = dict_result['designer']
-        # self.name_class_title = dict_result['designer']
-
-        # # сведения по зн-ю хар-ки
-        #self.name_tag_value = dict_result['designer']
-        # self.name_class_value = dict_result['designer']
-        # self.name_characteristics = dict_result['designer']
-
+        self._list_rules = dict_result['designer']['many']  # список из словарей, ключами являются название хар-ки, тег и аттрибуты
 
     def download_links(self):
         """
             Метод для вытаскивания ссылок из страниц товаров
-            Для работы метода необходимо, чтобы были переданы параметры
 
         """
         type_value = "href"
@@ -194,36 +192,56 @@ class constructor():
         count_sait = list(filter(lambda x: x.endswith('.html'), files))
         # print("count_sait", count_sait)
         num_page_old = len(count_sait)  # кол-во скачанных страниц, из к-х нужно доставать ссылки
-        # print(num_page_old)
-        num_page_old -= num_page_old-1
-
+        
         for i in range(0, num_page_old):
             name_file = self.name_website + str(i) + '.html'
 
-            with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name_file,
-                      "r",
-                      encoding='utf-8') as html_file:
+            with open(
+                    self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name_file,
+                    "r",
+                    encoding='utf-8') as html_file:
                 self._tree_dom_bs4 = BeautifulSoup(html_file, 'lxml')
-
 
             # поиск тегов  с определенным классом по дереву
             if self.name_tag != "" and self.name_class != "":
                 Nodes = self._tree_dom_bs4.find_all(self.name_tag, class_=self.name_class)
+
             elif self.name_tag != "" and self.name_class == "":
                 Nodes = self._tree_dom_bs4.find_all(self.name_tag)
-            print(f"Количество возможных ссылок: {len(Nodes)}")
-            print(f"{self.name_tag}, {self.name_class}")
-            with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt", "a",
-                      encoding='utf-8') as file:
-                for i in range(len(Nodes)):
-                    # print(Nodes[i].prettify())
-                    #print(f"Модель: {Nodes[i].text}")
-                    if self.name_product + " " in Nodes[i].text:
 
+            one_family_for_elements = 0
+            for i in range(len(Nodes)):
+                #print(Nodes[i].prettify())
+                
+                # Если имя продукта содержится в названии объявления в нижнем регистре
+                if (self.name_product.lower()) in Nodes[i].text.lower(): 
+                    if 'href' in Nodes[i].attrs: # доходим до первого подходящего кандидата, чтобы найти родителя
+                        one_family_for_elements = Nodes[i].parent # сохраняем семейство этих ссылок и работаем с ними
+                        #print(Nodes[i].prettify(),"\n\n")
+                        #print(one_family_for_elements.prettify())
+                        break
+            
+            # берем только одно семейство для извлечения ссылок
+            if self.name_tag != "" and self.name_class != "":
+                Nodes = one_family_for_elements.find_all(self.name_tag, class_=self.name_class)
+                
+            elif self.name_tag != "" and self.name_class == "":
+                Nodes = one_family_for_elements.find_all(self.name_tag)
+                        
+
+            with open(
+                    self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt",
+                    "a",
+                    encoding='utf-8') as file:
+                for i in range(len(Nodes)):
+                    #print(Nodes[i].prettify())
+                    #print(f"Модель: {Nodes[i].text}")kk
+                    if (self.name_product.lower()) in Nodes[i].text.lower(): # Все в нижнем регистре
+                        
                         if 'href' in Nodes[i].attrs:
-                            #print(f"Ссылка: {Nodes[i][type_value]}\n\n")
                             temp_link = Nodes[i][type_value]
                             main_piece_url = ""
+                            
 
                             # Проверка, что ссылка полная
                             if "https://" in temp_link:
@@ -243,8 +261,6 @@ class constructor():
                                 main_piece_url = self.url_product[:http_or_s + index_end]
 
                             file.write(main_piece_url + temp_link + "\n")
-
-
 
     """
     def collections_title_value(tree_BS4, current_DataBase: pd.DataFrame, path: str):
@@ -417,50 +433,7 @@ class constructor():
     """
 
 
-    def Save_html(self, name):
-        """name - имя, под которым сохранится файл"""
-        time.sleep(6)
-        # "Сохранить как..."
-        pyautogui.keyDown('ctrl')  # hold ctrl key
-        pyautogui.press('s')  # press s key
-        pyautogui.keyUp('ctrl')  # release ctrl key
-        # print("Not found")
-        time.sleep(3)
-        FILE_NAME = name  # имя, под которым сохранится HTML-файл: 'dns3.html'
-        pyautogui.typewrite(FILE_NAME)  # ввести заданное имя в окно в браузере
-        pyautogui.press(['tab', 'down', 'up', 'up', 'enter'])
-        pyautogui.press('enter')
-        # Проверяем, как только получится открыть файл, значит он сохранился, можно переходить к следующему действию
-
-        wait_end_time = datetime.now() + timedelta(seconds=15)
-
-        while datetime.now() < wait_end_time:
-            try:
-                f = open(self.path_downloads + self.separator_for_path + name)
-                f.close()
-                break
-            except:
-                # print(5, end = '')
-                time.sleep(.1)
-        else:
-            raise Exception('Save error')
-        # time.sleep(5)
-
-
-    def my_wait(driver, min_wait=0.0, max_wait=60.0):
-        wait_end_time = datetime.now() + timedelta(seconds=max_wait)
-
-        while datetime.now() < wait_end_time:
-            if driver.execute_script('return document.readyState != "complete";'): # JavaScript
-                time.sleep(min_wait)
-            else:
-                break
-        else:
-            raise Exception('timeout error')
-
-
     def download_pages(self):
-
 
         # Создание/переименовывание папки, в которой будут лежать скачанные страницы
         if not os.path.isdir(self.path_downloads + self.separator_for_path + self.name_website):
@@ -470,15 +443,19 @@ class constructor():
                       self.path_downloads + self.separator_for_path + self.name_website + str(datetime.now().date()) +
                       '_' + str(datetime.now().microsecond))
             os.mkdir(self.path_downloads + self.separator_for_path + self.name_website)
-        
-        # Пример работы Selenium без вызуального вывода и окон
-        # options = Options()
-        # options.headless = True
-        # options.add_argument("--window-size=1920,1200")
-        # driver = webdriver.Chrome(options=options, executable_path=self.web_driver)
 
         s = Service(self.web_driver)
         driver = webdriver.Chrome(service=s)  # запустить браузер
+
+        stealth(driver,
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+                languages=["en-US", "en"],
+                vendor="Google Inc.",
+                platform="Win32",
+                webgl_vendor="Intel Inc.",
+                renderer="Intel Iris OpenGL Engine",
+                fix_hairline=True,
+                )
 
         driver.implicitly_wait(1)
         driver.maximize_window()  # открыть окно браузера на весь экран
@@ -486,237 +463,362 @@ class constructor():
         try:
             driver.get(self.url_product)  # перейти по ссылке URL
             # my_wait(driver, 0.1, 30)
-            num_page_old = 1
-            name = self.name_website + str(num_page_old - 1) + '.html' # Имя страницы
-
-            # извлечение и сохранение данных страницы в папку в файл
+            
+            # Сохранение первой страницы из N штук
             page = driver.find_element(By.XPATH, "//body").get_attribute("outerHTML")
-            with open(self.path_downloads + self.separator_for_path + self.name_website + "\\" + name, "w", encoding="utf-8") as file:
+            
+            
+            number_of_pages = 1
+            name = self.name_website + str(number_of_pages-1) + '.html'  # Имя страницы
+
+
+            # Проверка в page на наличие кнопки перехода на следующую страницу
+            html_page = BeautifulSoup(page, 'lxml')
+            
+            # Поиск кнопки перехода на следующую страницу
+            next_page_list = html_page.find_all(self.tag_link_next_page, class_=self.class_link_next_page)
+            
+            next_page_link = ''
+            if next_page_list: # Если есть кандидаты с ссылкой на следующую страницу
+                for i in range(len(next_page_list)):
+                    if 'href' in next_page_list[i].attrs:
+                        next_page_link = next_page_list[i]['href']
+
+
+            
+            with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name, "w",
+                      encoding="utf-8") as file:
                 file.write(page)
+
             time.sleep(5)
-            """
-            self.Save_html(name)
-            os.replace(self.path_downloads + self.separator_for_path + name,
-                       self.path_downloads + self.separator_for_path + self.name_website + "\\" + name)
-            # print("pered while")
-            """
+
             flag_not_click = 0
-            while (True):
 
-                # Поиск количества страниц в скачанном файле
-                name = self.name_website + str(num_page_old - 1) + '.html'
-                with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + name,
-                          'r', encoding="utf-8") as name_html:
-                    soup = BeautifulSoup(name_html, 'lxml')
-                    if (self.name_attribute_last_page == 'class'):
-                        res = soup.find_all(self.name_teg_last_page, class_=self.name_class_last_page)
-                    elif (self.name_attribute_last_page == 'role'):
-                        res = soup.find_all(self.name_teg_last_page, role=self.name_class_last_page)
+            while (True): # Пока получается найти кнопку перехода на следующую страницу, работаем
+                
+                if next_page_link:
+                    #print(f"Переход на следующую страницу: {next_page_link}")
+                    
+                    # Переходим на следующую страницу и сохраняем её.
+                    try:
+                        time.sleep(3)
+                        #print("------------------")
+                        # WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[text()="' + self.button_text_new_page + '" and not(@disabled)]')))
+                        time.sleep(2)
 
-                    print(res)
+                        # Переходим на следующую страницу нажатием кнопки перехода
+                        Xpath_next_page = '//' + self.tag_link_next_page + '[@class="'+ self.class_link_next_page + '"]'
+                        driver.find_element(By.XPATH,Xpath_next_page).click()
+                         
 
-                    list_last_page = list()
-                    for i in range(len(res)):
-                        temp_num = res[i].text
-                        if temp_num.isdigit():
-                            list_last_page.append(int(temp_num))
-                            # print(f"Атрибуты: {res[i].attrs}\n\n")
-                        else:
-                            continue
-                    print("Список обнаруженных страниц: ", len(list_last_page))
-                    num_page_new = max(list_last_page)
-                    # print(f"Номер последней страницы: {max(list_last_page)}")
-                    """
-                    for i in range(len(res) - 1, 0, -1):
-                        # print(f"{res[i].text:>10}", "\n")
-                        num_page_new = res[i].text
-                        print(num_page_new)
-                        if (len(num_page_new) != 0):
-                            break
-                        # print(res[i].prettify())
-                    """
-                    print('num_page_new = ', num_page_new)
-                    print('num_page_old = ', num_page_old)
+                    except:
+                        print("Not click: Переход не был осуществлен", number_of_pages) # Перехода не было
+                        flag_not_click += 1
+                        break
+                    
+                    else: # Если ошибок в блоке try не возникло, выполнится код ниже
 
 
-                if (num_page_old < int(num_page_new)):
-                    for i in range(num_page_old, int(num_page_new)):
-                        try:
-                            time.sleep(3)
-                            print("------------------")
-
-                            # WebDriverWait(driver, 10).until(
-                            #   EC.element_to_be_clickable(
-                            #        (By.XPATH, '//button[text()="' + self.button_text_new_page +
-                            #         '" and not(@disabled)]')))
-                            
-                            time.sleep(2)
-                            
-                            # my_wait(driver, 0.1, 30)
-                            # driver.implicitly_wait(10)
-
-                            driver.find_element(By.XPATH, '//button[text()="' + self.button_text_new_page + '"]').click()
-
-                            # '" and not(@disabled)]').click()
-
-                            # для dns
-                            # driver.find_element(By.CLASS_NAME, 'pagination-widget__page-link pagination-widget__page-link_next').click()
-
-                            # для citilink
-                            # print(driver.find_element(By.CLASS_NAME, 'e4uhfkv0 app-catalog-1ls3bkl e4mggex0'))
-                            # my_wait(driver, 0.1, 30)
-                        except:
-                            print("Not click", i)
-                            flag_not_click += 1
-                            num_page_old = i
-                            break
-                        name = self.name_website + str(i) + '.html'
+                        number_of_pages += 1
+                        name = self.name_website + str(number_of_pages-1) + '.html'
                         # my_wait(driver, 0.1, 30)
 
-                        # Изъяли HTML код нужной страницы
+                        # Изъяли HTML код нужной страницы 
                         page = driver.find_element(By.XPATH, "//body").get_attribute("outerHTML")
+
+                        # Проверяем наличие кнопки перехода в конце бесконечного цикла
+                        html_page = BeautifulSoup(page, 'lxml')
                         
+                        # Поиск кнопки перехода на следующую страницу
+                        next_page_list = html_page.find_all(self.tag_link_next_page, class_=self.class_link_next_page)
+                        
+                        next_page_link = ''
+                        if next_page_list: # Если есть кандидаты с ссылкой на следующую страницу
+                            for i in range(len(next_page_list)):
+                                if 'href' in next_page_list[i].attrs:
+                                    next_page_link = next_page_list[i]['href']
+
                         # Записали в файл скачанный HTML код
                         with open(self.path_downloads + self.separator_for_path + self.name_website + "\\" + name, "w",
-                                  encoding="utf-8") as file:
+                                    encoding="utf-8") as file:
                             file.write(page)
-                        time.sleep(1)
-                        """
-                        self.Save_html(name)
-                        os.replace(self.path_downloads + self.separator_for_path + name,
-                                   self.path_downloads + self.separator_for_path + self.name_website + "\\" + name)
-                        """
 
-                        num_page_old = i + 1  # int(num_page_new)
-                        print("num_page_old: i+1 =", num_page_old)
-                    if (flag_not_click > 0): break
+                        time.sleep(1)
+                        
+
+                        print("Номер сохраненной страницы =", number_of_pages)
+
                 else:
+                    print(f"Либо нас заблокировали, либо это последняя страница: {next_page_link}")
                     break
+
         except Exception as ex:
             print(ex)
+            print("При скачивании страниц возникла проблема")
+        finally:
             driver.quit()
 
-
     def download_unic_pages(self):
-
 
         if not os.path.isdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic'):
             os.mkdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
         else:
             os.rename(self.path_downloads + self.separator_for_path + self.name_website + '_unic',
-                      self.path_downloads + self.separator_for_path + self.name_website + '_unic' + str(datetime.now().date()) +
+                      self.path_downloads + self.separator_for_path + self.name_website + '_unic' + str(
+                          datetime.now().date()) +
                       '_' + str(datetime.now().microsecond))
             os.mkdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
-        
+
         unic_url = list()
-        
-        with open(self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt", "r",
-                  encoding='utf-8') as file:
+
+        with open(
+                self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt",
+                "r",
+                encoding='utf-8') as file:
+            
             for line in file:
                 # unic_url.append(self.head_url + line)
                 unic_url.append(line)
 
         s = Service(self.web_driver)
         driver = webdriver.Chrome(service=s)  # запустить браузер
+
+        stealth(driver,
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+                languages=["en-US", "en"],
+                vendor="Google Inc.",
+                platform="Win32",
+                webgl_vendor="Intel Inc.",
+                renderer="Intel Iris OpenGL Engine",
+                fix_hairline=True
+                )
+
         driver.implicitly_wait(1)
         driver.maximize_window()  # открыть окно браузера на весь экран
+
         for i in range(0, len(unic_url)):
             # перейти по ссылке URL
             driver.get(unic_url[i])
+
+             # self.buttons_data - Выкладываю данные про кнопки с общего массива данных
+
+            try: # для каждой страницы нажимаем группу кнопок (массив словарей с данными)
+                for button_data in self.buttons_data: # идем по списку кнопок
+                    try: # пробуем поочередно нажать на кнопки
+                        time.sleep(2)
+
+                        Xpath_button = '//' + button_data["teg_name"] + '[@class="'+ button_data["class_name"] + '" and not(@disabled)]'
+                        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, Xpath_button)))
+                        time.sleep(2)
+                        candidates_buttons = driver.find_elements(By.XPATH, Xpath_button)
+                        for index_button in range(len(candidates_buttons)): # проходим по всем найденным кнопкам
+                            if button_data["button_text"] in candidates_buttons[index_button].text: # если это подходящая кнопка
+                                candidates_buttons[index_button].click()
+                                # print(f"Нажата клавиша {candidates_buttons[i].text}")
+                                # print("\n\n")
+
+                    except: # если не получилось нажать на кнопку
+                        continue
+                   
+            except:
+                print("Not click Не получилось нажать кнопку развертывания характеристик или фото")
+                continue
+
             try:
                 time.sleep(2)
-                WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, '//button[text()="' + self.button_characteristics +
-                                                '" and not(@disabled)]')))
+                name = self.name_website + '_unic_' + str(i) + '.html'
+                page = driver.find_element(By.XPATH, "//body").get_attribute("outerHTML")
+                with open(
+                        self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name,
+                        "w",
+                        encoding="utf-8") as file:
+                    file.write(page)
                 time.sleep(2)
-                driver.find_element(By.XPATH, '//button[text()="' + self.button_characteristics +
-                                    '" and not(@disabled)]').click()
 
-                # driver.find_element(By.CLASS_NAME, 'pagination-widget__page-link pagination-widget__page-link_next').click()
-            except:
-                print("Not click")
-                continue
-            else:
-                try:
-                    time.sleep(2)
-                    name = self.name_website + '_unic_' + str(i) + '.html'
-                    page = driver.find_element(By.XPATH, "//*").get_attribute("outerHTML")
-                    with open(self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name, "w",
-                              encoding="utf-8") as file:
-                        file.write(page)
-                    time.sleep(1)
-                    """
-                    self.Save_html(name)
-                    os.replace(self.path_downloads + self.separator_for_path + name,
-                               self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name)
-                    """
-                except Exception as ex:
-                    print(ex)
-                    driver.quit()
+            except Exception as ex:
+                print("Ошибка при сохранении файла с outerHTML")
+                print(ex)
 
+            
+        driver.quit()
 
-    def extraction_data(self):
-
-
+    def extraction_data_BS4(self):
 
         files = os.listdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
         list_files = list(filter(lambda x: x.endswith('.html'), files))
-        print(f"Кол-во скачанных страниц товара: \n{len(list_files)}")
+        print(f"Кол-во скачанных страниц товара: {len(list_files)}")
         temp_dict = dict()
         dict_for_post_request = dict()
         dict_for_post_request['site'] = self.name_website
         dict_for_post_request['type_product'] = self.name_product
+        
         for rule in self._list_rules:
-            temp_dict[rule['title']] = list()
+            temp_dict[rule['name_column']] = list()
+        temp_dict["Источник"] = list()
 
         # По всем скачанным файлам товара
         for name_file in list_files:
-            #name = self.name_website + '_unic_' + str(i) + '.html'
-            with open(self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file,
-                      'r',encoding="utf-8") as html_file:
+            # name = self.name_website + '_unic_' + str(i) + '.html'
+            with open(
+                    self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file,
+                    'r', encoding="utf-8") as html_file:
                 self._tree_dom_bs4 = BeautifulSoup(html_file, "lxml")
 
             list_unused_name = list(temp_dict.keys())
             # По всем полученным правилам
             for rule in self._list_rules:
 
-                str_title = rule['title']
+
                 str_all = str()
                 Nodes_all = self._tree_dom_bs4.find_all(rule['teg_name'], class_=rule['class_name'])
-                #print(len(Nodes_all))
+                # print(len(Nodes_all))
+
                 for i in range(len(Nodes_all)):
                     temp_str = Nodes_all[i].text
 
-                    if rule['title'] in temp_str:
-                        list_unused_name.remove(rule['title'])
+                    if rule['title'].lower() in temp_str.lower():
+                        list_unused_name.remove(rule['name_column'])
                         str_all = str(temp_str).replace("  ", " ")
                         str_all = " ".join(str_all.split())
                         break
-                size_title = len(str_title)
 
-                temp_dict[str_title].append(str_all[size_title:])
-                #print(f"{str_title}:{str_all[size_title:]}")
+
+                temp_dict[rule['name_column']].append(str_all[:])
+
+            temp_dict["Источник"].append(name_file) # потом удалить, все что связано с источником, весь столбец
 
             # По всем неиспользованным именам хар-тик из правил
-            for unused_name in list_unused_name:
-                temp_dict[unused_name].append("") # вставить заглушки
+            # print(f"Лист {list_unused_name}")
+            # for unused_name in list_unused_name:
+            #     print(temp_dict[unused_name])
+            #     temp_dict[unused_name].append("")  # вставить заглушки
 
         dict_for_post_request['data'] = temp_dict
+        #print(json.dumps(dict_for_post_request['data'], sort_keys=False, indent=4, ensure_ascii=False))
+        #print(dict_for_post_request['data'].keys())
 
-        #url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
-        dict_for_post_request = json.dumps(dict_for_post_request)
-        r = requests.post(self._url_server, data=dict_for_post_request, headers={'Content-Type': 'application/json'})
-        print(r)
+        df = pd.DataFrame(columns=dict_for_post_request['data'].keys())
+        print(dict_for_post_request['data'].keys())
+        for key in dict_for_post_request['data'].keys():
+            df[key] = dict_for_post_request['data'][key] # При одинаковом числе объявлений разное число характеристик
+            #print(f"key: {key} => {len(dict_for_post_request['data'][key][:len(dict_for_post_request['data']["Продажа"])])}")
 
-        # print("Кол-во тел-ов ",(len(temp_dict['Модель'])))
-        # for i in range(len(temp_dict['Модель'])):
-        #     print(f"{temp_dict['Модель'][i]}, {temp_dict['Разрешение экрана'][i]}, {temp_dict['Версия ОС'][i]}")
-            #print(temp_dict['Разрешение экрана'])
-            #print(temp_dict['Версия ОС'])
-        # Модель
-        # Разрешение экрана
-        # Версия ОС
+        for index_str in df.index:
+            print(df.iloc[index_str])
+            print("\n")
 
+
+
+        # url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
+        # dict_for_post_request = json.dumps(dict_for_post_request)
+        # r = requests.post(self._url_server, data=dict_for_post_request, headers={'Content-Type': 'application/json'})
+        # print(r)
+
+
+
+
+
+    def extraction_data(self):
+
+        files = os.listdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
+        list_files = list(filter(lambda x: x.endswith('.html'), files))
+
+        print(f"Кол-во скачанных страниц товара: {len(list_files)}")
+        temp_dict = dict()
+        dict_for_post_request = dict()
+        dict_for_post_request['site'] = self.name_website
+        dict_for_post_request['type_product'] = self.name_product
+
+        for rule in self._list_rules:
+            temp_dict[rule['name_column']] = list()
+        temp_dict["Источник"] = list()
+
+
+        # По всем скачанным файлам товара
+        for name_file in list_files:
+            options = Options()
+            options.add_argument("--headless=new") # for Chrome >= 109
+
+
+            s = Service(self.web_driver)
+            driver = webdriver.Chrome(service=s, options=options)  # запустить браузер
+
+            stealth(driver,
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+                    languages=["en-US", "en"],
+                    vendor="Google Inc.",
+                    platform="Win32",
+                    webgl_vendor="Intel Inc.",
+                    renderer="Intel Iris OpenGL Engine",
+                    fix_hairline=True
+                    )
+
+
+            # name = self.name_website + '_unic_' + str(i) + '.html'
+            path_to_page = self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file
+
+
+            list_unused_name = list(temp_dict.keys())
+            driver.get(path_to_page)
+            print(path_to_page)
+            try:
+                # По всем полученным правилам
+                for rule in self._list_rules:
+
+                    str_all = str()
+
+                    #time.sleep(2)
+
+                    XPATH = '//' + rule["teg_name"] + '[@class="' + rule['class_name'] + '"]'
+                    #WebDriverWait(driver, 1).until(EC.element_to_be_clickable((By.XPATH, XPATH)))
+                    # time.sleep(2)
+                    Nodes_all = driver.find_elements(By.XPATH, XPATH)
+
+                    # (self._tree_dom_bs4.find_all(rule['teg_name'], class_=rule['class_name']))
+                    # print(len(Nodes_all))
+
+                    for i in range(len(Nodes_all)):
+                        temp_str = Nodes_all[i].text
+
+                        if rule['title'].lower() in temp_str.lower():
+                            list_unused_name.remove(rule['name_column'])
+                            str_all = str(temp_str).replace("  ", " ")
+                            str_all = " ".join(str_all.split())
+                            break
+
+
+                    temp_dict[rule['name_column']].append(str_all[:])
+                    # print(f"{'name_column'}:{str_all[size_title:]}")
+
+            except Exception as ex:
+                print("-Неудачно")
+                print(ex)
+            finally:
+                driver.close()
+
+            temp_dict["Источник"].append(name_file)  # потом удалить, все что связано с источником, весь столбец
+            # По всем неиспользованным именам хар-тик из правил
+            # for unused_name in list_unused_name:
+            #    temp_dict[unused_name].append("")  # вставить заглушки
+
+        driver.quit()
+        dict_for_post_request['data'] = temp_dict
+
+        df = pd.DataFrame(columns=dict_for_post_request['data'].keys())
+        for key in dict_for_post_request['data'].keys():
+            df[key] = dict_for_post_request['data'][key] # При одинаковом числе объявлений разное число характеристик
+            #print(f"key: {key} => {len(dict_for_post_request['data'][key][:len(dict_for_post_request['data']["Объявление"])])}")
+
+        for index_str in df.index:
+            print(df.iloc[index_str])
+            print("\n")
+        #print(json.dumps(dict_for_post_request['data'], sort_keys=False, indent=4, ensure_ascii=False))
+        for key in dict_for_post_request['data'].keys():
+            print(f"key: {key} => {len(dict_for_post_request['data'][key])}")
+        # url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
+        # dict_for_post_request = json.dumps(dict_for_post_request)
+        # r = requests.post(self._url_server, data=dict_for_post_request, headers={'Content-Type': 'application/json'})
+        # print(r)
 
     def parsing_process(self):
 
@@ -735,170 +837,112 @@ class constructor():
         # Изъятие характеристик из скачанных страниц товара
         self.extraction_data()
 
+# ______________________________________________________________________________________________________________________
+# ______________________________________________________________________________________________________________________
+# ______________________________________________________________________________________________________________________
+def create_dict_rules():
+
+    dict_rules = {"designer": 
+        {
+            'one': {'site':'', 
+                    'type_product':'',
+                    'url':'',
+                    'teg_name_url':'',
+                    'class_name_url':'',
+                    'teg_name_number':'',
+                    'class_name_number':''
+                    },
+
+            'buttons': [  {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'ПТС'},
+                                            {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'о регистрации'},
+                                            {'teg_name': 'button', 'class_name': 'ezmft1z0 css-xst070 e104a11t0', 'button_text': 'фото'},
+                                            {'teg_name': 'button', 'class_name': 'css-18zgczx e3cb8x01', 'button_text': 'контакты'}],
+
+            'many': [] 
+        }
+    }
+
+
     
-    def download_links_old(self, path, name, tree_BS4=""):
-        with open(path + name, 'r', encoding='utf-8') as html_file:
-            tree_BS4 = BeautifulSoup(html_file, 'lxml')
-            # поиск тегов <a> с определенным классом по дереву
-            Nodes = tree_BS4.find_all("a", class_="catalog-product__name")
-            with open(path + "product_links.txt", "w", encoding='utf-8') as file:
-                for i in range(len(Nodes)):
-                    file.write(Nodes[i]['href'] + "\n")
+    # общие сведения
+    dict_rules['designer']['one']['site'] = 'drom'
+    dict_rules['designer']['one']['type_product'] = 'лада'
+    dict_rules['designer']['one']['url'] = 'https://novorossiysk.drom.ru/lada/2110/?unsold=1&distance=100",  # 2 страницы 38 объявлений'
+
+    dict_rules['designer']['one']['teg_name_url'] = 'a' # тег ссылки на машину в общем списке ссылок
+    dict_rules['designer']['one']['class_name_url'] = 'css-1oas0dk e1huvdhj1' # класс ссылки на машину в общем списке ссылок
+
+    # сведения для скачивания страниц
+    dict_rules['designer']['one']['teg_name_number'] = 'a'   # self.tag_link_next_page
+    dict_rules['designer']['one']['class_name_number'] = 'css-4gbnjj e24vrp30' # self.class_link_next_page
 
 
-    def download_pages_old(self):
-        if not os.path.isdir(self.path_downloads + '\\' + self.name_website):
-            os.mkdir(self.path_downloads + '\\' + self.name_website)
-        else:
-            os.rename(self.path_downloads + '\\' + self.name_website,
-                      self.path_downloads + '\\' + self.name_website + str(datetime.now().date()) +
-                      '_' + str(datetime.now().microsecond))
-            os.mkdir(self.path_downloads + '\\' + self.name_website)
-        s = Service(self.web_driver)
-        driver = webdriver.Chrome(service=s)  # запустить браузер
-        driver.implicitly_wait(1)
-        driver.maximize_window()  # открыть окно браузера на весь экран
-
-        try:
-            # перейти по ссылке URL
-            driver.get(self.url_product)
-            # my_wait(driver, 0.1, 30)
-            num_page_old = 1
-            name = self.name_website + str(num_page_old - 1) + '.html'
-            self.Save_html(name)
-            os.replace(self.path_downloads + '\\' + name,
-                       self.path_downloads + '\\' + self.name_website + "\\" + name)
-            print("pered while")
-            flag_not_click = 0
-            while (True):
-                name = self.name_website + str(num_page_old - 1) + '.html'
-                with open(self.path_downloads + '\\' + self.name_website + '\\' + name,
-                          'r', encoding="utf-8") as name_html:
-                    soup = BeautifulSoup(name_html, 'lxml')
-                    if (self.name_attribute_last_page == 'class'):
-                        res = soup.find_all(self.name_teg_last_page, class_=self.name_class_last_page)
-                    elif (self.name_attribute_last_page == 'role'):
-                        res = soup.find_all(self.name_teg_last_page, role=self.name_class_last_page)
-                    list_last_page = list()
-                    for i in range(len(res)):
-                        temp_num = res[i].text
-                        if temp_num.isdigit():
-                            list_last_page.append(int(temp_num))
-                            # print(f"Атрибуты: {res[i].attrs}\n\n")
-                    num_page_new = max(list_last_page)
-                    # print(f"Номер последней страницы: {max(list_last_page)}")
-                    """
-                    for i in range(len(res) - 1, 0, -1):
-                        # print(f"{res[i].text:>10}", "\n")
-                        num_page_new = res[i].text
-                        print(num_page_new)
-                        if (len(num_page_new) != 0):
-                            break
-                        # print(res[i].prettify())
-                    """
-                    print('num_page_new = ', num_page_new)
-                    print('num_page_old = ', num_page_old)
-                if (num_page_old < int(num_page_new)):
-                    for i in range(num_page_old, int(num_page_new)):
-                        try:
-                            time.sleep(3)
-                            WebDriverWait(driver, 20).until(
-                                EC.element_to_be_clickable(
-                                    (By.XPATH, '//button[text()="' + self.button_text_new_page +
-                                     '" and not(@disabled)]')))
-                            time.sleep(2)
-                            # my_wait(driver, 0.1, 30)
-                            # driver.implicitly_wait(10)
-                            # перейти на следующую страницу
-                            driver.find_element(By.XPATH, '//button[text()="' + self.button_text_new_page +
-                                                '" and not(@disabled)]').click()
-                            # driver.find_element(By.CLASS_NAME, 'pagination-widget__page-link pagination-widget__page-link_next').click()
-                            # my_wait(driver, 0.1, 30)
-                        except:
-                            print("Not click", i)
-                            flag_not_click += 1
-                            num_page_old = i
-                            break
-                        name = self.name_website + str(i) + '.html'
-                        # my_wait(driver, 0.1, 30)
-                        self.Save_html(name)
-                        os.replace(self.path_downloads + '\\' + name,
-                                   self.path_downloads + '\\' + self.name_website + "\\" + name)
-                        num_page_old = i + 1  # int(num_page_new)
-                        print("num_page_old: i+1 =", num_page_old)
-                    if (flag_not_click > 0): break
-                else:
-                    break
-        except Exception as ex:
-            print(ex)
-            driver.quit()
+    # сведения для поиска и нажатия кнопок при скачивании страниц
+    dict_rules['designer']['buttons'] = [   {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'ПТС'},
+                                            {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'о регистрации'},
+                                            {'teg_name': 'button', 'class_name': 'ezmft1z0 css-xst070 e104a11t0', 'button_text': 'фото'}]
 
 
-    def download_unic_pages_old(self):
-        if not os.path.isdir(self.path_downloads + '\\' + self.name_website + '_unic'):
-            os.mkdir(self.path_downloads + '\\' + self.name_website + '_unic')
-        else:
-            os.rename(self.path_downloads + '\\' + self.name_website + '_unic',
-                      self.path_downloads + '\\' + self.name_website + '_unic' + str(datetime.now().date()) +
-                      '_' + str(datetime.now().microsecond))
-            os.mkdir(self.path_downloads + '\\' + self.name_website + '_unic')
-        unic_url = list()
-        with open(self.path_downloads + '\\' + self.name_website + '\\' + "product_links.txt", "r",
-                  encoding='utf-8') as file:
-            for line in file:
-                unic_url.append(self.head_url + line)
-        s = Service(self.web_driver)
-        driver = webdriver.Chrome(service=s)  # запустить браузер
-        driver.implicitly_wait(1)
-        driver.maximize_window()  # открыть окно браузера на весь экран
-        for i in range(0, len(unic_url)):
-            # перейти по ссылке URL
-            driver.get(unic_url[i])
-            try:
-                time.sleep(2)
-                WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, '//button[text()="' + self.button_characteristics +
-                                                '" and not(@disabled)]')))
-                time.sleep(2)
-                # перейти на следующую страницу
-                driver.find_element(By.XPATH, '//button[text()=" ' + self.button_characteristics +
-                                    '" and not(@disabled)]').click()
-                # driver.find_element(By.CLASS_NAME, 'pagination-widget__page-link pagination-widget__page-link_next').click()
-            except:
-                print("Not click")
-                break
-            else:
-                try:
-                    name = self.name_website + '_unic_' + str(i) + '.html'
-                    self.Save_html(name)
-                    os.replace(self.path_downloads + '\\' + name,
-                               self.path_downloads + '\\' + self.name_website + '_unic' + '\\' + name)
-                except Exception as ex:
-                    print(ex)
-                    driver.quit()
+    # сведения для скачивания характеристик
+    dict_rules['designer']['many'] = [
+        {'title':'Продажа', 'teg_name':'div', 'class_name':'css-987tv1 eotelyr0','name_column':'Объявление'},
+        {'title': '₽', 'teg_name': 'div', 'class_name': 'css-eazmxc e162wx9x0', 'name_column':'Цена'},
+        {'title': 'цена', 'teg_name': 'div', 'class_name': 'css-1pubr08 e93r9u20','name_column':'Сравнение цены'},
+        {'title': 'ПТС', 'teg_name': 'button', 'class_name': 'e8vftt60 css-1uu0zmh e104a11t0', 'name_column':'Характеристики'},
+        {'title': 'регистрац', 'teg_name': 'button','class_name': 'e8vftt60 css-1uu0zmh e104a11t0','name_column':'Регистрации'},
+        {'title': 'розыск', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0','name_column':'Розыск'},
+        {'title': 'огранич', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0', 'name_column':'Ограничения'}
+                                     ] # список из словарей, ключами являются название хар-ки, тег и аттрибуты
 
-# xiaomi-redmi-note-11-4gb-64gb-twilight-blue-30062792
-# xiaomi-redmi-note-11-4gb-64gb-star-blue-30062764
-# xiaomi-redmi-9a-32gb-granite-gray-30051224
-# xiaomi-redmi-9a-32gb-glacial-blue-30063682
-# xiaomi-redmi-a1-32gb-black-30065370
-# xiaomi-redmi-9c-nfc-3gb-64gb-green-30063443
-# xiaomi-redmi-note-11s-6gb-128b-graphite-gray-30062385
-# xiaomi-redmi-9a-32gb-aurora-green-30063291
+    return dict_rules
+
+
+### ПРОВЕРКА РАБОТЫ МЕТОДА download_pages()
+
+'''drom = constructor(name_website="drom",
+                   name_product="лада",
+                   url_product="https://novorossiysk.drom.ru/lada/2110/?unsold=1&distance=100",  # 2 страницы 38 объявлений
+                   tag_link_next_page="a",
+                   class_link_next_page="css-4gbnjj e24vrp30",
+                  )
+drom.download_pages()
+'''
+
+
+### ПРОВЕРКА РАБОТЫ МЕТОДА download_links()
+"""
+drom = constructor(name_website="drom",
+                   name_product='лада',
+                   name_tag="a",                        # тег ссылки на машину в общем списке ссылок
+                   name_class="css-1oas0dk e1huvdhj1")  # класс ссылки на машину в общем списке ссылок
+drom.download_links()
+"""
+
+### ПРОВЕРКА РАБОТЫ МЕТОДА download_unic_pages()
+
+drom = constructor()
+dict_rules = create_dict_rules()
+drom.get_request(dict_result=dict_rules)
+
+drom.extraction_data_BS4()
+drom.extraction_data()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # _______________________________________________________________________________________
-path = 'C:\\Users\\Ingvar\\Downloads\\'
-sait = 'dns'
-sait_eld = 'eldorado'
-sait_citi = 'citilink'
-# path = 'C:\\Users\\Ingvar\\Desktop\\Documents\\WEB\\dns'
-# url = "https://www.dns-shop.ru/catalog/17a8a01d16404e77/smartfony/?order=6"
-url = "https://www.dns-shop.ru/search/?q=%D1%81%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%D1%8B+xiaomi+poco&category=17a8a01d16404e77"
-url_eld = "https://www.eldorado.ru/search/catalog.php?q=%D1%81%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%20xiaomi%20redmi%20note&utf"
-url_citi = "https://www.citilink.ru/catalog/smartfony/?text="
-url_mvideo = "https://www.mvideo.ru/product-list-page?q=%D1%81%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%D1%8B+xiaomi&category=smartfony-205"
-url_dns_unic = "https://www.dns-shop.ru/product/3c9695dde2d5ed20/667-smartfon-poco-f4-256-gb-seryj/"
+
 
 """
 with open("C:\\Users\\Ingvar\\Downloads\\eldo.html",'r', encoding='utf-8') as name_html:
@@ -914,13 +958,6 @@ with open("C:\\Users\\Ingvar\\Downloads\\eldo.html",'r', encoding='utf-8') as na
 """
 
 
-# test_mvideo = constructor(name_website="mvideo",
-#                           name_product="Смартфон",
-#                           encoding="utf-8",
-#                           name_tag="a",
-#                           name_class="product-title__text",)
-
-# test_mvideo.download_links()
 
 # url_Danil = 'https://a2da-89-179-47-18.eu.ngrok.io/api/information/'
 # r_full = requests.get(url_Danil)
@@ -934,50 +971,18 @@ with open("C:\\Users\\Ingvar\\Downloads\\eldo.html",'r', encoding='utf-8') as na
 #                   name_class_last_page=r['designer']['one']['class_name_number'],
 #                   button_text_new_page=r['designer']['one']['name_button'])
 
-
-obj = constructor(name_website="dns", name_product="Смартфон", url_product=url, name_teg_last_page="a",
-                  name_attribute_last_page="class", name_class_last_page="pagination-widget__page-link",
-                  button_text_new_page="Показать ещё")
-obj.download_pages()
-
-#obj.download_unic_pages()
-#
-
-# obj_citi = constructor(name_website="citilink", name_product="Смартфон", url_product=url_citi, name_teg_last_page='div',
-#                         name_attribute_last_page="class", name_class_last_page="app-catalog-h5nagc ero1s990",
-#                         button_text_new_page="Показать ещё")
-
-# obj_mvideo = constructor(name_website="mvideo", name_product="Смартфон", url_product=url_mvideo, name_teg_last_page='a',
-#                          name_attribute_last_page="class", name_class_last_page="page-link",
-#                          button_text_new_page="Показать ещё")
-# obj_mvideo.download_pages()
-# obj_citi.download_pages()
-#
-print("download_pages - good")
+'''
+obj = constructor(name_website="dns",
+                  name_product="Смартфон",
+                  url_product="https://www.dns-shop.ru/search/?q=%D1%81%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%D1%8B+xiaomi+poco&category=17a8a01d16404e77",
+                  name_teg_last_page="a",
+                  name_attribute_last_page="class",
+                  name_class_last_page="pagination-widget__page-link",
+                  button_text_new_page="Показать ещё")'''
 
 
-# s = Service("C:\\Users\\Ingvar\\chromedriver_win32\\chromedriver.exe")
-# driver = webdriver.Chrome(service=s)  # запустить браузер
-# driver.implicitly_wait(1)
-# driver.maximize_window()
-# driver.get(url_citi)
-# time.sleep(5)
-# WebDriverWait(driver, 10).until(
-#     EC.element_to_be_clickable((By.XPATH, '//button[text()="Показать ещё" and not(@disabled)]')))
-#
-# time.sleep(2)
-# driver.find_element(By.XPATH, '//button[text()="Показать ещё" and not(@disabled)]').click()
-# # driver.find_element(By.XPATH, '//button[@class="e4uhfkv0 app-catalog-1ls3bkl e4mggex0"]').click()
-# # driver.find_element(By.CLASS_NAME, 'button-ui button-ui_white button-ui_icon wishlist-btn').click()
-# time.sleep(5)
-# driver.quit()
-# page = driver.find_element(By.XPATH, "//*").get_attribute("outerHTML")
-# print(type(page))
 
 
-# with open("page.html", "w", encoding="utf-8") as file:
-#   file.write(page)
-# time.sleep(1)
 
 
 """
@@ -1014,6 +1019,8 @@ t1.start()
 
 # for i in range(0, len(count_sait_unic)):
 """
+
+
 """
 for i in range(0, 1350):
     name = 'dns_unic_' + str(i) + '.html'
@@ -1024,4 +1031,3 @@ print("Kol-vo phone", len(DataBase.index))
 DataBase.to_feather("DataBase.feather")
 t1.stop()
 """
-# _______________________________________________________________________________________
