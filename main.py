@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
 from datetime import datetime, timedelta
+from lxml import etree, html
 
 import time
 # from time import sleep
@@ -642,6 +643,18 @@ class constructor():
             
         driver.quit()
 
+    def _get_element_text(self, Nodes_all, rule, number, separator = ""):
+        """
+        :param Nodes_all: Список элементов
+        :param rule: правило, где есть информация о способе получения значения
+        :param number: порядковый номер элемента
+        :return:
+        """
+        if rule['search_mode']:  # если выбран XPath
+            return Nodes_all[number].text_content()  # '\n'
+        else:
+            return Nodes_all[number].get_text(separator=separator)
+
     def extraction_data_BS4(self):
 
         files = os.listdir(self.path_downloads + self.separator_for_path + self.name_website + '_unic')
@@ -651,41 +664,88 @@ class constructor():
         dict_for_post_request = dict()
         dict_for_post_request['site'] = self.name_website
         dict_for_post_request['type_product'] = self.name_product
-        
+
+
         for rule in self._list_rules:
             temp_dict[rule['name_column']] = list()
         temp_dict["Источник"] = list()
 
+        # COUNT_FILES = 25
+
         # По всем скачанным файлам товара
         for name_file in list_files:
+
+
             # name = self.name_website + '_unic_' + str(i) + '.html'
             with open(
                     self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file,
-                    'r', encoding="utf-8") as html_file:
+                    encoding="utf-8") as html_file:
                 self._tree_dom_bs4 = BeautifulSoup(html_file, "lxml")
+                tree = html.fromstring(str(self._tree_dom_bs4))
 
-            list_unused_name = list(temp_dict.keys())
+            # list_unused_name = list(temp_dict.keys())
             # По всем полученным правилам
             for rule in self._list_rules:
 
-
                 str_all = str()
-                Nodes_all = self._tree_dom_bs4.find_all(rule['teg_name'], class_=rule['class_name'])
-                # print(len(Nodes_all))
-
-                for i in range(len(Nodes_all)):
-                    temp_str = Nodes_all[i].text
-
-                    if rule['title'].lower() in temp_str.lower():
-                        list_unused_name.remove(rule['name_column'])
-                        str_all = str(temp_str).replace("  ", " ")
-                        str_all = " ".join(str_all.split())
-                        break
+                temp_str = str()
+                try:
+                    selector = rule["teg"] + "["+ rule['attr_name'] + "=" + rule['attr_value'] + "]"
+                    xpath = "//" + rule["teg"] + "[" + rule['attr_name'] + rule['attr_value'] + "]"
+                    if rule["search_mode"]:
+                        Nodes_all = tree.xpath(xpath)
+                    else:
+                        Nodes_all = self._tree_dom_bs4.select(selector)
 
 
-                temp_dict[rule['name_column']].append(str_all[:])
+                    if len(Nodes_all): # Если элемент найден
+                        if rule['type_value'] == 'text':
 
-            temp_dict["Источник"].append(name_file) # потом удалить, все что связано с источником, весь столбец
+                            if rule['text_help_piece'] == "":
+                                temp_str = self._get_element_text(Nodes_all,rule, rule['serial_number']-1,
+                                                                  separator=rule['separator'])
+                            else:
+                                text_element = self._get_element_text(Nodes_all, rule, rule['serial_number']-1,
+                                                                      separator=rule['separator'])
+                                if rule['text_help_piece'].lower() in text_element.lower():
+                                    temp_str = self._get_element_text(Nodes_all, rule, rule['serial_number']-1,
+                                                                      separator=rule['separator'])
+                                else:
+                                    for index_element in range(len(Nodes_all)):
+                                        text_element = self._get_element_text(Nodes_all,rule, index_element,
+                                                                              separator=rule['separator'])
+                                        if rule['text_help_piece'].lower() in text_element.lower():
+                                            temp_str = self._get_element_text(Nodes_all, rule, index_element,
+                                                                              separator=rule['separator'])
+                                            break
+
+                            str_all = str(temp_str).replace("  ", " ") # меняет много пробелов на 1
+                            str_all = " ".join(str_all.split())
+
+                        elif rule['type_value'] == 'href':
+                            list_links_photo = []
+                            for index_element in range(len(Nodes_all)):
+                                list_links_photo.append(Nodes_all[index_element].get(rule['type_value']))
+                            str_all = list_links_photo
+
+
+                        # list_unused_name.remove(rule['name_column']) # Не понятно нужен ли
+
+                    else: # Если элемента нет
+                        print(f"Не найден элемент: { rule['name_column']}. {name_file}\n")
+                except:
+                    print(f"Проблема при поиске элемента { rule['name_column']}. {name_file}\n")
+
+                temp_dict[rule['name_column']].append(str_all)
+
+
+            temp_dict["Источник"].append(name_file)  # потом удалить, все что связано с источником, весь столбец
+
+            # COUNT_FILES -= 1
+            # if COUNT_FILES == 0:
+            #     break
+
+
 
             # По всем неиспользованным именам хар-тик из правил
             # print(f"Лист {list_unused_name}")
@@ -707,15 +767,14 @@ class constructor():
             print(df.iloc[index_str])
             print("\n")
 
+        df.to_feather("DataBase_305.feather")
+
 
 
         # url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
         # dict_for_post_request = json.dumps(dict_for_post_request)
         # r = requests.post(self._url_server, data=dict_for_post_request, headers={'Content-Type': 'application/json'})
         # print(r)
-
-
-
 
 
     def extraction_data(self):
@@ -733,11 +792,13 @@ class constructor():
             temp_dict[rule['name_column']] = list()
         temp_dict["Источник"] = list()
 
+        COUNT_FILES = 10
 
         # По всем скачанным файлам товара
         for name_file in list_files:
             options = Options()
             options.add_argument("--headless=new") # for Chrome >= 109
+
 
 
             s = Service(self.web_driver)
@@ -759,6 +820,9 @@ class constructor():
 
 
             list_unused_name = list(temp_dict.keys())
+            list_unused_name.remove("Источник")
+
+
             driver.get(path_to_page)
             print(path_to_page)
             try:
@@ -794,27 +858,42 @@ class constructor():
                 print("-Неудачно")
                 print(ex)
             finally:
+                COUNT_FILES -= 1
+
                 driver.close()
 
             temp_dict["Источник"].append(name_file)  # потом удалить, все что связано с источником, весь столбец
+
             # По всем неиспользованным именам хар-тик из правил
             # for unused_name in list_unused_name:
-            #    temp_dict[unused_name].append("")  # вставить заглушки
+               # temp_dict[unused_name].append("")  # вставить заглушки
+
+            # for key123 in temp_dict.keys():
+            #     print(f"{key123} => {len(temp_dict[key123])}")
+            #     print(temp_dict[key123])
+
+            if COUNT_FILES == 0:
+                break
+
 
         driver.quit()
         dict_for_post_request['data'] = temp_dict
 
         df = pd.DataFrame(columns=dict_for_post_request['data'].keys())
         for key in dict_for_post_request['data'].keys():
-            df[key] = dict_for_post_request['data'][key] # При одинаковом числе объявлений разное число характеристик
+            df[key] = dict_for_post_request['data'][key]
             #print(f"key: {key} => {len(dict_for_post_request['data'][key][:len(dict_for_post_request['data']["Объявление"])])}")
 
-        for index_str in df.index:
-            print(df.iloc[index_str])
-            print("\n")
+        #df.to_feather("DataBase_New.feather")
+
+        # for index_str in df.index:
+        #     print(df.iloc[index_str])
+        #     print("\n")
         #print(json.dumps(dict_for_post_request['data'], sort_keys=False, indent=4, ensure_ascii=False))
-        for key in dict_for_post_request['data'].keys():
-            print(f"key: {key} => {len(dict_for_post_request['data'][key])}")
+
+        # for key in dict_for_post_request['data'].keys():
+        #     print(f"key: {key} => {len(dict_for_post_request['data'][key])}")
+
         # url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
         # dict_for_post_request = json.dumps(dict_for_post_request)
         # r = requests.post(self._url_server, data=dict_for_post_request, headers={'Content-Type': 'application/json'})
@@ -836,6 +915,8 @@ class constructor():
 
         # Изъятие характеристик из скачанных страниц товара
         self.extraction_data()
+
+
 
 # ______________________________________________________________________________________________________________________
 # ______________________________________________________________________________________________________________________
@@ -867,7 +948,7 @@ def create_dict_rules():
     # общие сведения
     dict_rules['designer']['one']['site'] = 'drom'
     dict_rules['designer']['one']['type_product'] = 'лада'
-    dict_rules['designer']['one']['url'] = 'https://novorossiysk.drom.ru/lada/2110/?unsold=1&distance=100",  # 2 страницы 38 объявлений'
+    dict_rules['designer']['one']['url'] = 'https://krasnodar.drom.ru/lada/2110/?distance=500&ph=1&unsold=1', # 306 объявлений
 
     dict_rules['designer']['one']['teg_name_url'] = 'a' # тег ссылки на машину в общем списке ссылок
     dict_rules['designer']['one']['class_name_url'] = 'css-1oas0dk e1huvdhj1' # класс ссылки на машину в общем списке ссылок
@@ -884,24 +965,270 @@ def create_dict_rules():
 
 
     # сведения для скачивания характеристик
+    # dict_rules['designer']['many'] = [
+    #     {'title':'Продажа', 'teg_name':'div', 'class_name':'css-987tv1 eotelyr0','name_column':'Объявление'},
+    #     {'title': '₽', 'teg_name': 'div', 'class_name': 'css-eazmxc e162wx9x0', 'name_column':'Цена'},
+    #     {'title': 'цена', 'teg_name': 'div', 'class_name': 'css-1pubr08 e93r9u20','name_column':'Сравнение цены'},
+    #     {'title': 'ПТС', 'teg_name': 'button', 'class_name': 'e8vftt60 css-1uu0zmh e104a11t0', 'name_column':'Характеристики'},
+    #     {'title': 'регистрац', 'teg_name': 'button','class_name': 'e8vftt60 css-1uu0zmh e104a11t0','name_column':'Регистрации'},
+    #     {'title': 'розыск', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0','name_column':'Розыск'},
+    #     {'title': 'огранич', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0', 'name_column':'Ограничения'}
+    #                                 ] # список из словарей, ключами являются название хар-ки, тег и аттрибуты
     dict_rules['designer']['many'] = [
-        {'title':'Продажа', 'teg_name':'div', 'class_name':'css-987tv1 eotelyr0','name_column':'Объявление'},
-        {'title': '₽', 'teg_name': 'div', 'class_name': 'css-eazmxc e162wx9x0', 'name_column':'Цена'},
-        {'title': 'цена', 'teg_name': 'div', 'class_name': 'css-1pubr08 e93r9u20','name_column':'Сравнение цены'},
-        {'title': 'ПТС', 'teg_name': 'button', 'class_name': 'e8vftt60 css-1uu0zmh e104a11t0', 'name_column':'Характеристики'},
-        {'title': 'регистрац', 'teg_name': 'button','class_name': 'e8vftt60 css-1uu0zmh e104a11t0','name_column':'Регистрации'},
-        {'title': 'розыск', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0','name_column':'Розыск'},
-        {'title': 'огранич', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0', 'name_column':'Ограничения'}
-                                     ] # список из словарей, ключами являются название хар-ки, тег и аттрибуты
+    {'text_help_piece': '',
+     'name_column': 'Объявление',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-987tv1 eotelyr0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode': ''
+     },
+
+    {'text_help_piece': '',
+     'name_column': 'Цена',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-eazmxc e162wx9x0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'Город',
+     'name_column': 'Город',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-inmjwf e162wx9x0"',
+     'serial_number': 2,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'от',
+     'name_column': 'Дата и номер объявления',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-pxeubi evnwjo70"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': '',
+     'name_column': 'Количество просмотров',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-14wh0pm e1lm3vns0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'цена',
+     'name_column': 'Мнение о цене от Drom',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-1nbcgqx evjskuu0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'л',
+     'name_column': 'Двигатель',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'л.с.',
+     'name_column': 'Мощность',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 2,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'ый',
+     'name_column': 'Цвет',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 5,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'поколение',
+     'name_column': 'Поколение',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 7,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'i',
+     'name_column': 'Комплектация',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 8,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'км',
+     'name_column': 'Пробег',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name':'class',
+     'attr_value': '"css-9xodgi ezjvm5n0"',
+     'serial_number': 6,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'ПТС',
+     'name_column': 'Характеристики и ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-13qo6o5 eawu4md1"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': '',
+     'name_column': 'Записи о регистрации',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value':'"css-n9frdv eawu4md0"',
+     'serial_number': 2,
+     'separator': '\n',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'розыск',
+     'name_column': 'Информация о розыске',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': 'class',
+     'attr_value': '"css-13qo6o5 e1mhp2ux0"',
+     'serial_number': 1,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'огранич',
+     'name_column': 'Информация об ограничениях',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name':'class',
+     'attr_value': '"css-13qo6o5 e1mhp2ux0"',
+     'serial_number': 2,
+     'separator': '',
+     'search_mode':''
+     },
+
+    {'text_help_piece': 'Марка модель',
+     'name_column': 'Марка модель по ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': '',
+     'attr_value': 'count(@*)="0" and string-length( text() )',
+     'serial_number': 8,
+     'separator': '',
+     'search_mode':'XPath'
+     },
+
+    {'text_help_piece': 'Год выпуска',
+     'name_column': 'Год выпуска по ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': '',
+     'attr_value': 'count(@*)="0" and string-length( text() )',
+     'serial_number': 9,
+     'separator': '',
+     'search_mode':'XPath'
+     },
+
+    {'text_help_piece': 'Рабочий объем',
+     'name_column': 'Рабочий объем по ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': '',
+     'attr_value': 'count(@*)="0" and string-length( text() )',
+     'serial_number': 10,
+     'separator': '',
+     'search_mode':'XPath'
+     },
+
+    {'text_help_piece': 'Мощность',
+     'name_column': 'Мощность по ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': '',
+     'attr_value': 'count(@*)="0" and string-length( text() )',
+     'serial_number': 11,
+     'separator': '',
+     'search_mode':'XPath'
+     },
+
+    {'text_help_piece': 'Цвет',
+     'name_column': 'Цвет по ПТС',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': '',
+     'attr_value': 'count(@*)="0" and string-length( text() )',
+     'serial_number': 12,
+     'separator': '',
+     'search_mode':'XPath'
+     },
+
+
+    {'text_help_piece': '',
+     'name_column': 'Фотографии',
+     'type_value': 'href',
+     'teg': 'a',
+     'attr_name': '',
+     'attr_value': 'contains(@href, ".jpg") and not(@id)',
+     'serial_number': 9,
+     'separator': '',
+     'search_mode':'XPath'
+     }
+    ]
 
     return dict_rules
 
 
-### ПРОВЕРКА РАБОТЫ МЕТОДА download_pages()
 
-'''drom = constructor(name_website="drom",
+### ПРОВЕРКА РАБОТЫ МЕТОДА download_pages()
+'''
+drom = constructor(name_website="drom",
                    name_product="лада",
-                   url_product="https://novorossiysk.drom.ru/lada/2110/?unsold=1&distance=100",  # 2 страницы 38 объявлений
+                   url_product= 'https://krasnodar.drom.ru/lada/2110/?distance=500&ph=1&unsold=1', # 306 объявлений
+                   #"https://novorossiysk.drom.ru/lada/2110/?unsold=1&distance=100",  # 2 страницы 38 объявлений
                    tag_link_next_page="a",
                    class_link_next_page="css-4gbnjj e24vrp30",
                   )
@@ -910,35 +1237,29 @@ drom.download_pages()
 
 
 ### ПРОВЕРКА РАБОТЫ МЕТОДА download_links()
-"""
+'''
 drom = constructor(name_website="drom",
                    name_product='лада',
                    name_tag="a",                        # тег ссылки на машину в общем списке ссылок
                    name_class="css-1oas0dk e1huvdhj1")  # класс ссылки на машину в общем списке ссылок
 drom.download_links()
-"""
+'''
+
 
 ### ПРОВЕРКА РАБОТЫ МЕТОДА download_unic_pages()
 
 drom = constructor()
 dict_rules = create_dict_rules()
 drom.get_request(dict_result=dict_rules)
-
+# drom.download_unic_pages()
 drom.extraction_data_BS4()
-drom.extraction_data()
 
 
 
-
-
-
-
-
-
-
-
-
-
+# print("База: ")
+# DB_df = pd.read_feather("DataBase.feather")
+# for index in DB_df.index:
+#     print(DB_df.iloc[index])
 
 
 # _______________________________________________________________________________________

@@ -15,6 +15,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
+from lxml import etree
+from lxml import html
+
 # Для расширенного функционала по настройке proxy, заголовков, cookies и прочего
 # Есть проблемы, чего-то не хватает для полного функционирования
 # import seleniumwire.undetected_chromedriver as uc
@@ -578,49 +581,162 @@ ScrapeOps = constructor_()
 # ________________________________________________________________________________________________________________________________________________
 # ________________________________________________________________________________________________________________________________________________
 # ________________________________________________________________________________________________________________________________________________
+if False:
+    s = Service("C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe")
+    options = Options()
+    options.add_argument("--headless=new") # for Chrome >= 109
 
-s = Service("C:\\Users\\Ingvar\\PycharmProjects\\parsing_constructor\\chromedriver_win64\\chromedriver.exe")
-driver = webdriver.Chrome(service=s)  # запустить браузер
+    driver = webdriver.Chrome(service=s, options=options)  # запустить браузер
 
-stealth(driver,
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
-        languages=["en-US", "en"],
-        vendor="Google Inc.",
-        platform="Win32",
-        webgl_vendor="Intel Inc.",
-        renderer="Intel Iris OpenGL Engine",
-        fix_hairline=True,
-        )
-driver.maximize_window()
-driver.get("file:///C:/Users/Ingvar/Downloads/one_car.html")
-time.sleep(3)
+    stealth(driver,
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 YaBrowser/23.11.0.0 Safari/537.36",
+            languages=["en-US", "en"],
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+            )
+    driver.maximize_window()
+    driver.get("file:///C:/Users/Ingvar/Downloads/drom_unic/drom_unic_0.html")
 
-# Выкладываю данные про кнопки с общего массива данных
-buttons = [{'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'ПТС'},
-           {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'о регистрации'},
-           {'teg_name': 'button', 'class_name': 'ezmft1z0 css-xst070 e104a11t0', 'button_text': 'фото'},
-           {'teg_name': 'button', 'class_name': 'css-18zgczx e3cb8x01', 'button_text': 'контакты'}] 
+    buttons = [   {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'ПТС'},
+                                                {'teg_name': 'button', 'class_name':'e8vftt60 css-1uu0zmh e104a11t0', 'button_text': 'о регистрации'},
+                                                {'teg_name': 'button', 'class_name': 'ezmft1z0 css-xst070 e104a11t0', 'button_text': 'фото'}]
 
-try: # для каждой страницы нажимаем группу кнопок (массив словарей с данными)
-    for button_data in buttons: # идем по списку кнопок
-        try: # пробуем поочередно нажать на кнопки
-            print(f"Кнопка: {button_data}")
-            time.sleep(2)
-            Xpath_button = '//' + button_data["teg_name"] + '[@class="'+ button_data["class_name"] + '" and not(@disabled)]'
-            #Xpath_button_with_text = '//'+ button_data['teg_name'] + '[text()="' + button_data["button_text"] + '" and not(@disabled)]'
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, Xpath_button)))
-            time.sleep(2)
-            candidates_buttons = driver.find_elements(By.XPATH, Xpath_button)
-            for i in range(len(candidates_buttons)):
-                if button_data["button_text"] in candidates_buttons[i].text:
-                    candidates_buttons[i].click
-                    print(f"Нажата клавиша {candidates_buttons[i].text}")
-                    print("\n\n")
-        
-        except: # если не получилось нажать на кнопку
-            continue
-        
-except:
-    print("Not click Не получилось нажать кнопку развертывания характеристик или фото")
-    # continue
+    for button_data in buttons:
+        Xpath_button = '//' + button_data["teg_name"] + '[@class="' + button_data["class_name"] + '"]'
+        candidates_buttons = driver.find_elements(By.XPATH, Xpath_button)
+        for index_button in range(len(candidates_buttons)):  # проходим по всем найденным кнопкам
+            if button_data["button_text"] in candidates_buttons[index_button].text:  # если это подходящая кнопка
+                candidates_buttons[index_button].click()
+
+    xpath = '/html/body/div[2]/div[4]/div[1]/div[1]/div[2]/div[2]/div[3]/div[2]/div[2]'
+
+    candidates = driver.find_elements(By.XPATH, xpath)
+    #print(len(candidates))
+    for element in candidates:
+        aaa = element.text
+        #print(candidate.get_dom_attribute("href"))
+        print(aaa.count('\n'))
+        print(aaa)
+
+
+    driver.close()
+
+    driver.quit()
+
+rules = [
+    {'title_delete': '',
+     'name_column': 'Пробег',
+     'type_value': 'text',
+     'teg': 'td',
+     'attr_name': 'class',
+     'attr_value':'css-9xodgi ezjvm5n0',
+     'serial_number' : 6,
+     'quantity':'one'
+    },
+
+    {'title_delete': '',
+     'name_column': 'Пробег',
+     'type_value': 'text',
+     'teg': 'span',
+     'attr_name': 'class',
+     'attr_value': 'css-1osyw3j ei6iaw00',
+     'serial_number': 1,
+     'quantity': 'one'
+     },
+
+    {'title_delete': '',
+     'name_column': 'Записи о регистрации',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': 'class',
+     'attr_value':'css-n9frdv eawu4md0',
+     'serial_number' : 0,
+     'quantity': 'all'
+     },
+
+    {'title_delete': 'Год выпуска: ',
+     'name_column': 'Год выпуска',
+     'type_value': 'text',
+     'teg': 'div',
+     'attr_name': 'count(@*)',
+     'attr_value': '0',
+     'serial_number': 22,
+     'quantity': 'one'
+     }
+]
+
+def check_rules(path_file, rules):
+
+    with open(path_file, encoding='utf-8') as file:
+        html_file = BeautifulSoup(file, 'lxml')
+        for rule in rules:
+            try:
+                selector = rule["teg"] + "[" + rule["attr_name"] + "='" + rule['attr_value'] + "']"
+                res = html_file.select(selector)
+
+                print(f"Кол-во найденных подходящих элементов: {len(res)}")
+                if len(res):
+                    if rule['quantity'] == "one":
+                        print(f"{rule['name_column']}:\n{res[rule['serial_number']-1].get_text(separator="")}")
+                    elif rule['quantity'] == "all":
+                        print(f"{rule['name_column']}:\n{res[rule['serial_number']-1].get_text(separator="\n")}")
+                print("\n")
+            except Exception:
+                #print(Exception)
+                tree = etree.ElementTree(html_file)
+                tree2 = etree.HTML(str(html_file))
+                current_xpath = rule['tag'] + "[" + rule["attr_name"] + "='" + rule['attr_value'] + "']" # div[count(@*)='0']
+                res = tree.xpath(current_xpath)
+
+                print(f"Кол-во найденных подходящих элементов: {len(res)}")
+                if len(res):
+                    if rule['quantity'] == "one":
+                        print(f"{rule['name_column']}:\n{res[rule['serial_number'] - 1].get_text(separator="")}")
+                    elif rule['quantity'] == "all":
+                        print(f"{rule['name_column']}:\n{res[rule['serial_number'] - 1].get_text(separator="\n")}")
+                print("\n")
+
+        result = html_file.find_all(name="div", attrs={'class': 'css-n9frdv eawu4md0'})
+        print(len(result))
+
+
+start = False
+if start:
+    files = os.listdir('C:\\Users\\Ingvar\\Downloads\\drom_unic')
+    list_files = list(filter(lambda x: x.endswith('.html'), files))
+
+    for name_file in list_files:
+        check_rules(path_file='C:\\Users\\Ingvar\\Downloads\\drom_unic\\' + name_file, rules=rules)
+
+
+#check_rules(path_file='C:\\Users\\Ingvar\\Downloads\\drom_unic\\drom_unic_0.html', rules=rules)
+#check_rules(path_file='C:\\Users\\Ingvar\\Downloads\\drom_unic\\drom_unic_1.html', rules=rules)
+
+my_rule ={'text_help_piece': '',
+     'name_column': 'Фотографии',
+     'type_value': 'href',
+     'teg': 'a',
+     'attr_name': '',
+     'attr_value': 'contains(@href, ".jpg") and not(@id)',
+     'serial_number': 9,
+     'separator': '',
+     'search_mode':'XPath'
+     }
+a = True
+with open('C:\\Users\\Ingvar\\Downloads\\drom_unic\\drom_unic_1.html', encoding='utf-8') as file:
+    html_file = BeautifulSoup(file, 'lxml')
+
+    tree = html.fromstring(str(html_file))
+    list_links_photo = []
+    current_xpath = "//" + my_rule['teg'] + "[" + my_rule["attr_name"] + my_rule['attr_value'] + "]"  # div[count(@*)='0']
+    Nodes_all = tree.xpath(current_xpath)
+    for index_element in range(len(Nodes_all)):
+        list_links_photo.append(Nodes_all[index_element].get(my_rule['type_value']))
+
+    print(f"{len(list_links_photo)}")
+    print(*list_links_photo)
+
+
