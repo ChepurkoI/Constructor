@@ -263,175 +263,6 @@ class constructor():
 
                             file.write(main_piece_url + temp_link + "\n")
 
-    """
-    def collections_title_value(tree_BS4, current_DataBase: pd.DataFrame, path: str):
-        names_classes = {'title': 'product-characteristics__spec-title',
-                         'value': 'product-characteristics__spec-value'}
-        # TR = Translator(from_lang="ru", to_lang="en")
-        stringe = str()
-        Nodes = tree_BS4.find_all("div",
-                                  class_="product-characteristics__group")  # поиск объекта с группами характеристик
-        example_type = type(tree_BS4.find('div'))  # для проверки типа "Tag" и наличия метода attrs
-        current_columns = current_DataBase.columns  # столбцы текущей БД, которую передали как параметр
-        unused_names_columns = current_DataBase.columns
-        # print(type(unused_names_columns))
-        list_unused_names_columns = list(unused_names_columns)
-
-        # буферная однострочная БД для склеивания с текущей,
-        # создается на основе столбцов текущей БД
-        buffer_DataBase = pd.DataFrame(columns=current_columns)
-
-        #Сбор характеристик по DOM-дереву конкретного телефона
-        # по каждой группе с харатеристиками
-        for i in range(len(Nodes)):
-            # print(f"{Nodes[i].text:>50} ,\n")
-            # print(Nodes[i].prettify())
-            # print(Nodes[i].prettify())
-            List_child = Nodes[i].descendants
-            # print("List_child: ", len(list(List_child)))
-            count = 0
-
-            flag_title = False
-            flag_value = False
-            name_title = str()
-            value_title = str()
-
-            # Прямой дочерний элемент - это дочерний элемент,
-            # который находится непосредственно под родительским
-            # элементом с точки зрения иерархии. То есть не внук или правнук.
-            # print(f"{Nodes[i].text:>50} ,\n")
-            # по каждому полю в группе
-            TITLE_None = 0
-            for child in List_child:
-                # print(count, end=" ")
-                # count += 1
-                # print("\t ", type(child), ": ", child, "\n")
-
-                # Проверка на то, что это тэг и у него будет метод attrs
-                if type(child) is example_type:
-                    if 'class' in child.attrs:
-                        # print(child.attrs)
-                        # print(names_classes['title'] in child['class'])
-                        if names_classes['title'] in child['class']:  # a in b, a-строка, b-список
-                            # print(child.string)
-                            if child.string is None:
-                                # создание среза из генератора дочерних элементов, для перехода к следующему
-                                list_name_title = list(
-                                    itertools.islice(Nodes[i].descendants, TITLE_None + 1, TITLE_None + 2))
-                                name_title = list_name_title[0]
-                                flag_title = True
-
-                                # t1 = Class_Timer.Timer()
-                                # t1.start()
-                                # res = TR.translate(name_title)
-                                # t1.stop()
-                                # print("title: ", name_title)
-                                # stringe = " ".join([stringe,name_title])
-                                # print(stringe)
-                            else:
-                                # name_title = child.string # не работает, так как берет None, вместо строки
-                                name_title = child.string
-
-                                # stringe = " ".join([stringe,name_title])
-                                flag_title = True
-                                # print("title", name_title)
-                                # print(stringe)
-                        elif names_classes['value'] in child['class']:
-                            value_title = child.string
-                            flag_value = True
-                            # print("value: ", value_title) # .encode('utf-8'))
-
-                        if flag_title and flag_value:
-                            if value_title is None:
-                                value_title = 'Перечисление'
-                            temp_value = value_title.encode('utf-8').decode('utf-8')
-
-                            if (name_title in list_unused_names_columns):  # Удаление использованных имен столбцов
-                                list_unused_names_columns.remove(name_title)
-
-                            # удаление пробелов
-                            temp_value = temp_value.lstrip()
-                            temp_value = temp_value.rstrip()
-                            temp_name = name_title
-                            temp_name = temp_name.lstrip()
-                            temp_name = temp_name.rstrip()
-                            buffer_DataBase[temp_name] = [temp_value]  # .replace(" ", "")
-                            flag_title = False
-                            flag_value = False
-
-                # print("child.string = ", child.string, end="\n\n")
-                # print("\n\n")
-                TITLE_None += 1
-            # print("\n\n")
-
-        # Подсчет кол-во новых столбцов
-        old_and_new_columns = buffer_DataBase.columns
-        count_current_columns = len(current_columns)
-        count_old_and_new_columns = len(old_and_new_columns)
-        count_new_columns = count_old_and_new_columns - count_current_columns  # нашел число новых столбцов
-
-        # Извлечение имен новых столбцов
-        # Чтобы достать названия новых столбцов, мне необходимо закинуть старые и новые столбцы в структуру Series,
-        # далее при помощи числовых индексов и знания кол-ва "старых"(текущих) стобцов вытащить их имена
-
-        # Пример:
-        # текущая БД -> 75 столбцов, ,буферная БД -> 77 столбцов
-        # Число новых столбцов = 77 - 75 = 2
-        # index_new_columns = list(Series_new_columns[count_current_columns:].index) -> [76,77]
-        # Из Series с пронумерованными названиями столбцов буферной БД извлекаю названия под номерами 76 и 77
-        # Добавляю новые столбцы к текущей БД с пустыми ячейками заданной длины(длина = последний индекс в текущей БД)
-        #
-        # а
-
-        Series_new_columns = pd.Series(
-            old_and_new_columns)  # формирую Series на основе имеющихся столбцов из буферной БД
-
-        # Беру срез из Series, начиная с последнего столбца текущей БД +1
-        # Вытаскиваю индексы "новых" столбцов и формирую из них список
-        index_new_columns = list(Series_new_columns[count_current_columns:].index)
-        names_new_columns = list()
-        for i in index_new_columns:
-            names_new_columns.append(Series_new_columns[i])
-
-        # Добавление новых столбцов к текущей БД и заполнение для старых телефонов каждой ячейки нового столбца затычкой
-        # кол-во ячеек в столбцах
-        temp = list(current_DataBase.index)
-        if len(temp):
-            count_box = temp[-1] + 1  # индекс последней строки в текущей БД
-        else:
-            count_box = 0
-        list_empty = [""] * count_box
-
-        DF_list_empty = pd.DataFrame(list_empty, columns=[name])
-
-        # добавление пустых столбцов к текущей БД
-        for name_column in names_new_columns:
-            DF_list_empty = pd.DataFrame(list_empty, columns=[name_column])
-            current_DataBase = pd.concat([current_DataBase, DF_list_empty], axis=1)
-            # current_DataBase[name_column] = list_empty
-
-        # Конкатенация буферной БД и текущей
-        # print("Текущая БД: ", current_DataBase)
-        # print("Буферная БД: ",buffer_DataBase)
-        current_DataBase = pd.concat([current_DataBase, buffer_DataBase], ignore_index=True)
-
-        flag_print = False
-        keys = current_DataBase.columns
-        if flag_print:
-            for key in keys:
-                print(f"{current_DataBase[key]}\n")
-        # t1 = Class_Timer.Timer()
-        # t1.start()
-        # res = TR.translate(stringe)
-        # t1.stop()
-        # print(res)
-
-        # if len(unused_names_columns): # если остались неиспользованные имена столбцов
-        #     last_index = current_DataBase.index[-1]
-        #     for name_column in unused_names_columns: # для каждого имени вставляем затычку
-        #         current_DataBase[name_column, last_index] = ""
-        return current_DataBase
-    """
 
 
     def download_pages(self):
@@ -665,24 +496,34 @@ class constructor():
         dict_for_post_request['site'] = self.name_website
         dict_for_post_request['type_product'] = self.name_product
 
+        product_links = []
+        with open( self.path_downloads + self.separator_for_path + self.name_website + self.separator_for_path + "product_links.txt",
+                "r",
+                encoding='utf-8') as file:
 
+            for line in file:
+                product_links.append(line)
+
+        temp_dict["Источник"] = list()
         for rule in self._list_rules:
             temp_dict[rule['name_column']] = list()
-        temp_dict["Источник"] = list()
+
 
         # COUNT_FILES = 25
 
         # По всем скачанным файлам товара
         for name_file in list_files:
 
+            index_link = int(name_file.replace(".html", "")[len(self.name_website + '_unic_'):])
 
             # name = self.name_website + '_unic_' + str(i) + '.html'
             with open(
                     self.path_downloads + self.separator_for_path + self.name_website + '_unic' + self.separator_for_path + name_file,
                     encoding="utf-8") as html_file:
+
                 self._tree_dom_bs4 = BeautifulSoup(html_file, "lxml")
                 tree = html.fromstring(str(self._tree_dom_bs4))
-
+                temp_dict["Источник"].append(product_links[index_link])
             # list_unused_name = list(temp_dict.keys())
             # По всем полученным правилам
             for rule in self._list_rules:
@@ -732,14 +573,16 @@ class constructor():
                         # list_unused_name.remove(rule['name_column']) # Не понятно нужен ли
 
                     else: # Если элемента нет
-                        print(f"Не найден элемент: { rule['name_column']}. {name_file}\n")
+                        pass
+                        #print(f"Не найден элемент: { rule['name_column']}. {name_file}\n")
                 except:
-                    print(f"Проблема при поиске элемента { rule['name_column']}. {name_file}\n")
+                    pass
+                    #print(f"Проблема при поиске элемента { rule['name_column']}. {name_file}\n")
 
                 temp_dict[rule['name_column']].append(str_all)
 
 
-            temp_dict["Источник"].append(name_file)  # потом удалить, все что связано с источником, весь столбец
+
 
             # COUNT_FILES -= 1
             # if COUNT_FILES == 0:
@@ -768,8 +611,6 @@ class constructor():
             print("\n")
 
         df.to_feather("DataBase_305.feather")
-
-
 
         # url = "https://35a4-89-179-47-36.eu.ngrok.io/api/information/"
         # dict_for_post_request = json.dumps(dict_for_post_request)
@@ -975,19 +816,19 @@ def create_dict_rules():
     #     {'title': 'огранич', 'teg_name': 'div', 'class_name': 'css-13qo6o5 e1mhp2ux0', 'name_column':'Ограничения'}
     #                                 ] # список из словарей, ключами являются название хар-ки, тег и аттрибуты
     dict_rules['designer']['many'] = [
-    {'text_help_piece': '',
-     'name_column': 'Объявление',
-     'type_value': 'text',
-     'teg': 'div',
-     'attr_name':'class',
-     'attr_value': '"css-987tv1 eotelyr0"',
-     'serial_number': 1,
-     'separator': '',
-     'search_mode': ''
-     },
+    # {'text_help_piece': '',
+    #  'name_column': 'Объявление',
+    #  'type_value': 'text',
+    #  'teg': 'div',
+    #  'attr_name':'class',
+    #  'attr_value': '"css-987tv1 eotelyr0"',
+    #  'serial_number': 1,
+    #  'separator': '',
+    #  'search_mode': ''
+    #  },
 
     {'text_help_piece': '',
-     'name_column': 'Цена',
+     'name_column': 'Цена (руб.)',
      'type_value': 'text',
      'teg': 'div',
      'attr_name':'class',
@@ -1053,7 +894,7 @@ def create_dict_rules():
      },
 
     {'text_help_piece': 'л.с.',
-     'name_column': 'Мощность',
+     'name_column': 'Мощность (л.с.)',
      'type_value': 'text',
      'teg': 'td',
      'attr_name':'class',
@@ -1063,27 +904,27 @@ def create_dict_rules():
      'search_mode':''
      },
 
-    {'text_help_piece': 'ый',
-     'name_column': 'Цвет',
-     'type_value': 'text',
-     'teg': 'td',
-     'attr_name':'class',
-     'attr_value': '"css-9xodgi ezjvm5n0"',
-     'serial_number': 5,
-     'separator': '',
-     'search_mode':''
-     },
+    # {'text_help_piece': 'ый',
+    #  'name_column': 'Цвет',
+    #  'type_value': 'text',
+    #  'teg': 'td',
+    #  'attr_name':'class',
+    #  'attr_value': '"css-9xodgi ezjvm5n0"',
+    #  'serial_number': 5,
+    #  'separator': '',
+    #  'search_mode':''
+    #  },
 
-    {'text_help_piece': 'поколение',
-     'name_column': 'Поколение',
-     'type_value': 'text',
-     'teg': 'td',
-     'attr_name':'class',
-     'attr_value': '"css-9xodgi ezjvm5n0"',
-     'serial_number': 7,
-     'separator': '',
-     'search_mode':''
-     },
+    # {'text_help_piece': 'поколение',
+    #  'name_column': 'Поколение',
+    #  'type_value': 'text',
+    #  'teg': 'td',
+    #  'attr_name':'class',
+    #  'attr_value': '"css-9xodgi ezjvm5n0"',
+    #  'serial_number': 7,
+    #  'separator': '',
+    #  'search_mode':''
+    #  },
 
     {'text_help_piece': 'i',
      'name_column': 'Комплектация',
@@ -1097,7 +938,7 @@ def create_dict_rules():
      },
 
     {'text_help_piece': 'км',
-     'name_column': 'Пробег',
+     'name_column': 'Пробег (км)',
      'type_value': 'text',
      'teg': 'td',
      'attr_name':'class',
@@ -1107,16 +948,16 @@ def create_dict_rules():
      'search_mode':''
      },
 
-    {'text_help_piece': 'ПТС',
-     'name_column': 'Характеристики и ПТС',
-     'type_value': 'text',
-     'teg': 'div',
-     'attr_name':'class',
-     'attr_value': '"css-13qo6o5 eawu4md1"',
-     'serial_number': 1,
-     'separator': '',
-     'search_mode':''
-     },
+    # {'text_help_piece': 'ПТС',
+    #  'name_column': 'Характеристики и ПТС',
+    #  'type_value': 'text',
+    #  'teg': 'div',
+    #  'attr_name':'class',
+    #  'attr_value': '"css-13qo6o5 eawu4md1"',
+    #  'serial_number': 1,
+    #  'separator': '',
+    #  'search_mode':''
+    #  },
 
     {'text_help_piece': '',
      'name_column': 'Записи о регистрации',
@@ -1174,7 +1015,7 @@ def create_dict_rules():
      },
 
     {'text_help_piece': 'Рабочий объем',
-     'name_column': 'Рабочий объем по ПТС',
+     'name_column': 'Рабочий объем по ПТС (см3)',
      'type_value': 'text',
      'teg': 'div',
      'attr_name': '',
@@ -1185,7 +1026,7 @@ def create_dict_rules():
      },
 
     {'text_help_piece': 'Мощность',
-     'name_column': 'Мощность по ПТС',
+     'name_column': 'Мощность по ПТС (л.с.)',
      'type_value': 'text',
      'teg': 'div',
      'attr_name': '',
@@ -1265,20 +1106,6 @@ drom.extraction_data_BS4()
 # _______________________________________________________________________________________
 
 
-"""
-with open("C:\\Users\\Ingvar\\Downloads\\eldo.html",'r', encoding='utf-8') as name_html:
-    soup = BeautifulSoup(name_html, 'lxml')
-    res = soup.find_all('a', role="button")
-    list_last_page = list()
-    for i in range(len(res)):
-        temp_num = res[i].text
-        if temp_num.isdigit():
-            list_last_page.append(int(temp_num))
-            #print(f"Атрибуты: {res[i].attrs}\n\n")
-    print(f"Номер последней страницы: {max(list_last_page)}")
-"""
-
-
 
 # url_Danil = 'https://a2da-89-179-47-18.eu.ngrok.io/api/information/'
 # r_full = requests.get(url_Danil)
@@ -1292,63 +1119,3 @@ with open("C:\\Users\\Ingvar\\Downloads\\eldo.html",'r', encoding='utf-8') as na
 #                   name_class_last_page=r['designer']['one']['class_name_number'],
 #                   button_text_new_page=r['designer']['one']['name_button'])
 
-'''
-obj = constructor(name_website="dns",
-                  name_product="Смартфон",
-                  url_product="https://www.dns-shop.ru/search/?q=%D1%81%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%D1%8B+xiaomi+poco&category=17a8a01d16404e77",
-                  name_teg_last_page="a",
-                  name_attribute_last_page="class",
-                  name_class_last_page="pagination-widget__page-link",
-                  button_text_new_page="Показать ещё")'''
-
-
-
-
-
-
-"""
-
-files = os.listdir(path + sait_citi)
-count_sait = list(filter(lambda x: x.endswith('.html'), files))
-print("count_sait", count_sait)
-num_page_old = len(count_sait)  # кол-во скачанных страниц, из к-х нужно доставать ссылки
-print(num_page_old)
-# num_page_old = 75
-
-
-#for i in range(0, num_page_old):
-#    name = sait + str(i) + '.html'
-#    obj.download_links(name_file=name, name_tag='a', name_class='catalog-product__name')
-
-for i in range(0, num_page_old):
-    name = sait_citi + str(i) + '.html'
-    obj_citi.download_links(name_file=name, name_tag='a', name_class='XD')
-
-# print(len(unic_url))
-# obj.download_unic_pages()
-print("download_unic_pages - good")
-
-import Class_Timer
-
-# if (num_page_old==163783):
-t1 = Class_Timer.Timer()
-# DataBase = pd.DataFrame()
-
-t1.start()
-# files = os.listdir(path + sait + '_unic')
-# count_sait_unic = list(filter(lambda x: x.endswith('.html'), files))
-
-# for i in range(0, len(count_sait_unic)):
-"""
-
-
-"""
-for i in range(0, 1350):
-    name = 'dns_unic_' + str(i) + '.html'
-    with open('C:\\Users\\Ingvar\\Desktop\\Documents\\WEB\\dns_unic\\' + name, 'r', encoding="utf-8") as html_file:
-        tree_phone_charact = BeautifulSoup(html_file, "lxml")
-        DataBase = collections_title_value(tree_phone_charact, DataBase, "")
-print("Kol-vo phone", len(DataBase.index))
-DataBase.to_feather("DataBase.feather")
-t1.stop()
-"""
